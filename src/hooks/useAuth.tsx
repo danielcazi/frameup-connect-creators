@@ -51,7 +51,19 @@ export const useAuth = () => {
     return { error };
   };
 
-  const signUp = async (email: string, password: string, userType: 'creator' | 'editor', fullName: string) => {
+  const signUp = async (
+    email: string, 
+    password: string, 
+    userType: 'creator' | 'editor', 
+    fullName: string,
+    username: string,
+    phone: string,
+    profilePhotoUrl?: string,
+    editorData?: {
+      portfolioVideos: Array<{ url: string; type: string; position: number }>;
+      softwareSkills: string[];
+    }
+  ) => {
     const redirectUrl = `${window.location.origin}/`;
     
     const { data, error } = await supabase.auth.signUp({
@@ -62,6 +74,14 @@ export const useAuth = () => {
         data: {
           user_type: userType,
           full_name: fullName,
+          username,
+          phone,
+          profile_photo_url: profilePhotoUrl,
+          // Editor-specific metadata (will be used to populate tables)
+          ...(editorData && {
+            portfolio_videos: editorData.portfolioVideos,
+            software_skills: editorData.softwareSkills,
+          })
         }
       }
     });
