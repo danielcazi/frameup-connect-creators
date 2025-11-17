@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Video, Scissors, Eye, EyeOff, Check, X, Upload, Link as LinkIcon } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from '@/hooks/use-toast';
 
 const signupSchema = z.object({
   userType: z.enum(['creator', 'editor'], {
@@ -29,9 +31,51 @@ const signupSchema = z.object({
     .regex(/[0-9]/, 'Senha deve ter pelo menos 1 número'),
   avatarType: z.enum(['upload', 'url', 'none']).default('none'),
   avatarUrl: z.string().optional(),
+  // Editor-specific fields
+  portfolioVideo1: z.string().optional(),
+  portfolioVideo2: z.string().optional(),
+  portfolioVideo3: z.string().optional(),
+  softwareSkills: z.array(z.string()).optional(),
   termsAccepted: z.boolean().refine((val) => val === true, {
     message: 'Você deve aceitar os termos',
   }),
+}).superRefine((data, ctx) => {
+  // Editor-specific validations
+  if (data.userType === 'editor') {
+    const urlRegex = /(youtube\.com|youtu\.be|vimeo\.com|drive\.google\.com)/;
+    
+    if (!data.portfolioVideo1 || !urlRegex.test(data.portfolioVideo1)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Cole um link válido do YouTube, Vimeo ou Drive',
+        path: ['portfolioVideo1'],
+      });
+    }
+    
+    if (!data.portfolioVideo2 || !urlRegex.test(data.portfolioVideo2)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Cole um link válido do YouTube, Vimeo ou Drive',
+        path: ['portfolioVideo2'],
+      });
+    }
+    
+    if (!data.portfolioVideo3 || !urlRegex.test(data.portfolioVideo3)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Cole um link válido do YouTube, Vimeo ou Drive',
+        path: ['portfolioVideo3'],
+      });
+    }
+    
+    if (!data.softwareSkills || data.softwareSkills.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Selecione pelo menos um software',
+        path: ['softwareSkills'],
+      });
+    }
+  }
 });
 
 type SignupForm = z.infer<typeof signupSchema>;
@@ -146,9 +190,85 @@ const Signup = () => {
     setValue('avatarType', 'url');
   };
 
-  const onSubmit = (data: SignupForm) => {
-    console.log('Form data:', data);
-    // Logic will be implemented in next prompt
+  const { signUp } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const onSubmit = async (data: SignupForm) => {
+    setIsSubmitting(true);
+    
+    try {
+      const { data: authData, error } = await signUp(
+        data.email,
+        data.password,
+        data.userType,
+        data.fullName,
+        data.username,
+        data.phone,
+        avatarPreview || undefined,
+        // Editor-specific data
+        data.userType === 'editor' ? {
+          portfolioVideos: [
+            { url: data.portfolioVideo1!, type: 'simple', position: 1 },
+            { url: data.portfolioVideo2!, type: 'dynamic', position: 2 },
+            { url: data.portfolioVideo3!, type: 'motion', position: 3 },
+          ],
+          softwareSkills: data.softwareSkills!
+        } : undefined
+      );
+
+      if (error) {
+        // Handle specific errors
+        if (error.message.includes('Supabase não configurado')) {
+          toast({
+            title: 'Backend não configurado',
+            description: 'Para criar conta, primeiro conecte o Lovable Cloud.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        
+        if (error.message.includes('already registered') || error.message.includes('já cadastrado')) {
+          toast({
+            title: 'Email já cadastrado',
+            description: 'Este email já está em uso. Tente fazer login.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        
+        toast({
+          title: 'Erro ao criar conta',
+          description: error.message || 'Tente novamente mais tarde.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Success!
+      toast({
+        title: 'Conta criada com sucesso!',
+        description: 'Você será redirecionado em instantes...',
+      });
+
+      // Redirect based on user type
+      setTimeout(() => {
+        if (data.userType === 'creator') {
+          navigate('/creator/dashboard');
+        } else {
+          navigate('/editor/pricing');
+        }
+      }, 1500);
+
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      toast({
+        title: 'Erro ao criar conta',
+        description: 'Ocorreu um erro inesperado. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getInitials = (name: string) => {
@@ -420,6 +540,150 @@ const Signup = () => {
                   </div>
                 </div>
 
+                {/* Editor-Specific Fields */}
+                {selectedType === 'editor' && (
+                  <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6 border-t border-border pt-6">
+                    {/* Portfolio Section */}
+                    <div>
+                      <h2 className="mb-2 text-xl font-semibold text-foreground">
+                        PORTFÓLIO
+                      </h2>
+                      <p className="mb-4 text-sm text-muted-foreground">
+                        Adicione 3 vídeos do seu trabalho
+                      </p>
+
+                      <div className="space-y-4">
+                        {/* Vídeo 1: Conteúdo Simples */}
+                        <div className="space-y-2">
+                          <Label htmlFor="portfolioVideo1">
+                            📹 Vídeo 1: Conteúdo Simples <span className="text-destructive">*</span>
+                          </Label>
+                          <Input
+                            id="portfolioVideo1"
+                            type="url"
+                            placeholder="https://vimeo.com/... ou https://youtube.com/..."
+                            {...register('portfolioVideo1')}
+                            className={errors.portfolioVideo1 ? 'border-destructive' : ''}
+                          />
+                          {errors.portfolioVideo1 && (
+                            <p className="text-sm text-destructive">
+                              {errors.portfolioVideo1.message}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Vídeo 2: Conteúdo Dinâmico */}
+                        <div className="space-y-2">
+                          <Label htmlFor="portfolioVideo2">
+                            ⚡ Vídeo 2: Conteúdo Dinâmico <span className="text-destructive">*</span>
+                          </Label>
+                          <Input
+                            id="portfolioVideo2"
+                            type="url"
+                            placeholder="https://vimeo.com/... ou https://youtube.com/..."
+                            {...register('portfolioVideo2')}
+                            className={errors.portfolioVideo2 ? 'border-destructive' : ''}
+                          />
+                          {errors.portfolioVideo2 && (
+                            <p className="text-sm text-destructive">
+                              {errors.portfolioVideo2.message}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Vídeo 3: Reels com Motion */}
+                        <div className="space-y-2">
+                          <Label htmlFor="portfolioVideo3">
+                            🎨 Vídeo 3: Reels com Motion <span className="text-destructive">*</span>
+                          </Label>
+                          <Input
+                            id="portfolioVideo3"
+                            type="url"
+                            placeholder="https://vimeo.com/... ou https://youtube.com/..."
+                            {...register('portfolioVideo3')}
+                            className={errors.portfolioVideo3 ? 'border-destructive' : ''}
+                          />
+                          {errors.portfolioVideo3 && (
+                            <p className="text-sm text-destructive">
+                              {errors.portfolioVideo3.message}
+                            </p>
+                          )}
+                        </div>
+
+                        <p className="text-sm text-muted-foreground">
+                          ℹ️ Cole links públicos do YouTube, Vimeo ou Google Drive
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Software Skills Section */}
+                    <div>
+                      <h2 className="mb-4 text-xl font-semibold text-foreground">
+                        SOFTWARES QUE DOMINA
+                      </h2>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="premiere"
+                            onCheckedChange={(checked) => {
+                              const current = watch('softwareSkills') || [];
+                              if (checked) {
+                                setValue('softwareSkills', [...current, 'Adobe Premiere Pro']);
+                              } else {
+                                setValue('softwareSkills', current.filter(s => s !== 'Adobe Premiere Pro'));
+                              }
+                            }}
+                          />
+                          <label htmlFor="premiere" className="text-sm text-foreground cursor-pointer">
+                            Adobe Premiere Pro
+                          </label>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="davinci"
+                            onCheckedChange={(checked) => {
+                              const current = watch('softwareSkills') || [];
+                              if (checked) {
+                                setValue('softwareSkills', [...current, 'DaVinci Resolve']);
+                              } else {
+                                setValue('softwareSkills', current.filter(s => s !== 'DaVinci Resolve'));
+                              }
+                            }}
+                          />
+                          <label htmlFor="davinci" className="text-sm text-foreground cursor-pointer">
+                            DaVinci Resolve
+                          </label>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="finalcut"
+                            onCheckedChange={(checked) => {
+                              const current = watch('softwareSkills') || [];
+                              if (checked) {
+                                setValue('softwareSkills', [...current, 'Final Cut Pro']);
+                              } else {
+                                setValue('softwareSkills', current.filter(s => s !== 'Final Cut Pro'));
+                              }
+                            }}
+                          />
+                          <label htmlFor="finalcut" className="text-sm text-foreground cursor-pointer">
+                            Final Cut Pro
+                          </label>
+                        </div>
+
+                        {errors.softwareSkills && (
+                          <p className="text-sm text-destructive">
+                            {errors.softwareSkills.message}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Terms and Submit */}
                 <div className="space-y-4 border-t border-border pt-6">
                   <div className="flex items-start gap-2">
@@ -446,8 +710,20 @@ const Signup = () => {
                     </p>
                   )}
 
-                  <Button type="submit" className="w-full" size="lg">
-                    Continuar
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    size="lg"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
+                        Criando conta...
+                      </>
+                    ) : (
+                      'Finalizar Cadastro'
+                    )}
                   </Button>
 
                   <p className="text-center text-sm text-muted-foreground">
