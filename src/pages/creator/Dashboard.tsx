@@ -1,28 +1,114 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Video, LogOut, Plus, FolderOpen } from 'lucide-react';
+import { Plus, FolderOpen, CheckCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import DashboardLayout from '@/components/layout/DashboardLayout';
+import MetricCard from '@/components/creator/MetricCard';
+import ProjectCard from '@/components/creator/ProjectCard';
+import EmptyState from '@/components/common/EmptyState';
+
+interface Project {
+  id: string;
+  title: string;
+  status: string;
+  updated_at: string;
+  current_applications?: number;
+  assigned_editor?: {
+    full_name: string;
+    username: string;
+    profile_photo_url?: string;
+  };
+}
+
+interface Metrics {
+  activeProjects: number;
+  completedProjects: number;
+  awaitingReview: number;
+}
 
 const CreatorDashboard = () => {
   const navigate = useNavigate();
-  const { user, signOut, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [metrics, setMetrics] = useState<Metrics>({
+    activeProjects: 0,
+    completedProjects: 0,
+    awaitingReview: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('recent');
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       navigate('/login');
     }
-  }, [user, loading, navigate]);
+  }, [user, authLoading, navigate]);
 
-  const handleSignOut = async () => {
-    await signOut();
+  useEffect(() => {
+    if (user) {
+      fetchProjects();
+    }
+  }, [user, statusFilter, sortBy]);
+
+  const fetchProjects = async () => {
+    if (!user) return;
+
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('projects')
+        .select(`
+          *,
+          assigned_editor:users!assigned_editor_id(
+            full_name,
+            username,
+            profile_photo_url
+          )
+        `)
+        .eq('creator_id', user.id);
+
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+
+      // Apply sorting
+      query = query.order('created_at', { ascending: sortBy === 'oldest' });
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      setProjects(data || []);
+
+      // Calculate metrics
+      const allProjects = data || [];
+      setMetrics({
+        activeProjects: allProjects.filter(p => p.status === 'in_progress').length,
+        completedProjects: allProjects.filter(p => p.status === 'completed').length,
+        awaitingReview: allProjects.filter(p => p.status === 'in_review').length,
+      });
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (loading) {
+  const handleNewProject = () => {
+    navigate('/creator/project/new');
+  };
+
+  if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
           <p className="mt-4 text-muted-foreground">Carregando...</p>
         </div>
       </div>
@@ -30,93 +116,102 @@ const CreatorDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Video className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold text-foreground">FRAMEUP</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-foreground">
-                  {user?.user_metadata?.full_name || user?.email}
-                </p>
-                <p className="text-xs text-muted-foreground">Creator</p>
-              </div>
-              <Button variant="outline" size="sm" onClick={handleSignOut}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Sair
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+    <DashboardLayout
+      userType="creator"
+      title="Meus Projetos"
+      subtitle="Gerencie seus projetos de edição de vídeo"
+      headerAction={
+        <Button onClick={handleNewProject}>
+          <Plus className="mr-2 h-4 w-4" />
+          Criar Projeto
+        </Button>
+      }
+    >
+      {/* Metrics Section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <MetricCard
+          title="Projetos Ativos"
+          value={metrics.activeProjects}
+          icon={<FolderOpen />}
+          color="blue"
+          subtitle="Em andamento"
+        />
+        
+        <MetricCard
+          title="Projetos Concluídos"
+          value={metrics.completedProjects}
+          icon={<CheckCircle />}
+          color="green"
+          subtitle="Finalizados"
+        />
+        
+        <MetricCard
+          title="Aguardando Revisão"
+          value={metrics.awaitingReview}
+          icon={<Clock />}
+          color="yellow"
+          subtitle="Pendente aprovação"
+        />
+      </div>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="mb-2 text-3xl font-bold text-foreground">
-            Dashboard do Creator
-          </h1>
-          <p className="text-muted-foreground">
-            Bem-vindo de volta! Gerencie seus projetos de edição.
-          </p>
+      {/* Projects List Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+        <h2 className="text-xl font-semibold text-foreground">Todos os Projetos</h2>
+        
+        <div className="flex gap-3 w-full sm:w-auto">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="open">Aguardando Editor</SelectItem>
+              <SelectItem value="in_progress">Em Andamento</SelectItem>
+              <SelectItem value="in_review">Em Revisão</SelectItem>
+              <SelectItem value="completed">Concluídos</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="Ordenar" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="recent">Mais Recente</SelectItem>
+              <SelectItem value="oldest">Mais Antigo</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+      </div>
 
-        {/* Quick Actions */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-xl border border-border bg-card p-6 transition-all hover:border-primary/50 hover:shadow-lg">
-            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Plus className="h-6 w-6" />
-            </div>
-            <h3 className="mb-2 text-lg font-semibold text-foreground">
-              Novo Projeto
-            </h3>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Publique um novo projeto e receba propostas de editores
-            </p>
-            <Button className="w-full bg-primary hover:bg-primary-hover">
-              Criar Projeto
-            </Button>
-          </div>
-
-          <div className="rounded-xl border border-border bg-card p-6 transition-all hover:border-primary/50 hover:shadow-lg">
-            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <FolderOpen className="h-6 w-6" />
-            </div>
-            <h3 className="mb-2 text-lg font-semibold text-foreground">
-              Meus Projetos
-            </h3>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Visualize e gerencie todos os seus projetos
-            </p>
-            <Button variant="outline" className="w-full">
-              Ver Projetos
-            </Button>
-          </div>
-        </div>
-
-        {/* Empty State */}
-        <div className="mt-12 text-center">
-          <div className="mx-auto mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-            <FolderOpen className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h3 className="mb-2 text-xl font-semibold text-foreground">
-            Nenhum projeto ainda
-          </h3>
-          <p className="mb-6 text-muted-foreground">
-            Crie seu primeiro projeto para começar a trabalhar com editores profissionais
-          </p>
-          <Button className="bg-primary hover:bg-primary-hover">
-            <Plus className="mr-2 h-4 w-4" />
-            Criar Primeiro Projeto
-          </Button>
-        </div>
-      </main>
-    </div>
+      {/* Projects List */}
+      <div className="space-y-4">
+        {loading && (
+          <>
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </>
+        )}
+        
+        {!loading && projects.length === 0 && (
+          <EmptyState
+            illustration="projects"
+            title="Nenhum projeto ainda"
+            description="Crie seu primeiro projeto e encontre o editor perfeito para seu conteúdo."
+            action={{
+              label: "Criar Primeiro Projeto",
+              onClick: handleNewProject,
+              variant: "default",
+            }}
+          />
+        )}
+        
+        {!loading && projects.map(project => (
+          <ProjectCard key={project.id} project={project} />
+        ))}
+      </div>
+    </DashboardLayout>
   );
 };
 
