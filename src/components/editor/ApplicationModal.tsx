@@ -110,18 +110,19 @@ function ApplicationModal({ project, onClose, onSuccess }: ApplicationModalProps
     setSubmitting(true);
 
     try {
-      const { error } = await supabase.from('project_applications').insert({
-        project_id: project.id,
-        editor_id: user?.id,
-        message: message.trim(),
-        status: 'pending',
+      // Use stored procedure for validation and creation
+      const { data, error } = await supabase.rpc('validate_and_create_application', {
+        p_project_id: project.id,
+        p_editor_id: user?.id,
+        p_message: message.trim(),
       });
 
-      if (error) {
-        if (error.code === '23505') {
-          throw new Error('Você já se candidatou a este projeto');
-        }
-        throw error;
+      if (error) throw error;
+
+      const result = data[0];
+
+      if (!result.success) {
+        throw new Error(result.error_message);
       }
 
       toast({
