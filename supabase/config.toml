@@ -9,3 +9,12 @@ verify_jwt = false
 
 [functions.stripe-subscription-webhook]
 verify_jwt = false
+
+[functions.cancel-subscription]
+verify_jwt = false
+
+[functions.reactivate-subscription]
+verify_jwt = false
+
+[functions.create-portal-session]
+verify_jwt = false
