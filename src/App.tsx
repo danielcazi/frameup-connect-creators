@@ -13,6 +13,7 @@ import CreatorDashboard from "./pages/creator/Dashboard";
 import NewProject from "./pages/creator/NewProject";
 import ProjectPreview from "./pages/creator/ProjectPreview";
 import Payment from "./pages/creator/Payment";
+import PaymentSuccess from "./pages/creator/PaymentSuccess";
 import EditorDashboard from "./pages/editor/Dashboard";
 import EditorPricing from "./pages/editor/Pricing";
 import NotFound from "./pages/NotFound";
@@ -63,6 +64,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredUserType="creator">
                   <Payment />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/creator/project/:id/payment-success"
+              element={
+                <ProtectedRoute requiredUserType="creator">
+                  <PaymentSuccess />
                 </ProtectedRoute>
               }
             />
