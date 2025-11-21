@@ -12,6 +12,7 @@ import RecoverPassword from "./pages/RecoverPassword";
 import CreatorDashboard from "./pages/creator/Dashboard";
 import NewProject from "./pages/creator/NewProject";
 import ProjectPreview from "./pages/creator/ProjectPreview";
+import Payment from "./pages/creator/Payment";
 import EditorDashboard from "./pages/editor/Dashboard";
 import EditorPricing from "./pages/editor/Pricing";
 import NotFound from "./pages/NotFound";
@@ -50,10 +51,18 @@ const App = () => (
               }
             />
             <Route
-              path="/creator/project/:id/payment"
+              path="/creator/project/:id/preview"
               element={
                 <ProtectedRoute requiredUserType="creator">
                   <ProjectPreview />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/creator/project/:id/payment"
+              element={
+                <ProtectedRoute requiredUserType="creator">
+                  <Payment />
                 </ProtectedRoute>
               }
             />
