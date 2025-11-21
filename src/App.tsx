@@ -18,6 +18,7 @@ import EditorDashboard from "./pages/editor/Dashboard";
 import EditorPricing from "./pages/editor/Pricing";
 import SubscriptionPlans from "./pages/editor/SubscriptionPlans";
 import ManageSubscription from "./pages/editor/ManageSubscription";
+import ProjectDetails from "./pages/editor/ProjectDetails";
 import SubscriptionGuard from "./components/guards/SubscriptionGuard";
 import NotFound from "./pages/NotFound";
 
@@ -111,6 +112,16 @@ const App = () => (
               element={
                 <ProtectedRoute requiredUserType="editor">
                   <ManageSubscription />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/editor/project/:id"
+              element={
+                <ProtectedRoute requiredUserType="editor">
+                  <SubscriptionGuard requireActive={true}>
+                    <ProjectDetails />
+                  </SubscriptionGuard>
                 </ProtectedRoute>
               }
             />
