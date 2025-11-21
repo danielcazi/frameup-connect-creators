@@ -17,6 +17,7 @@ import PaymentSuccess from "./pages/creator/PaymentSuccess";
 import EditorDashboard from "./pages/editor/Dashboard";
 import EditorPricing from "./pages/editor/Pricing";
 import SubscriptionPlans from "./pages/editor/SubscriptionPlans";
+import SubscriptionGuard from "./components/guards/SubscriptionGuard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -82,7 +83,9 @@ const App = () => (
               path="/editor/dashboard"
               element={
                 <ProtectedRoute requiredUserType="editor">
-                  <EditorDashboard />
+                  <SubscriptionGuard requireActive={true}>
+                    <EditorDashboard />
+                  </SubscriptionGuard>
                 </ProtectedRoute>
               }
             />
