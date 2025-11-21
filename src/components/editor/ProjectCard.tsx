@@ -1,186 +1,224 @@
 import React from 'react';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Clock, DollarSign, Users, Calendar, CheckCircle } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import Badge from '@/components/common/Badge';
+import Button from '@/components/common/Button';
+import Avatar from '@/components/common/Avatar';
+import {
+  Calendar,
+  DollarSign,
+  Clock,
+  Film,
+  Sparkles,
+  Users,
+  CheckCircle,
+  Lock,
+} from 'lucide-react';
+
+interface Project {
+  id: string;
+  title: string;
+  description: string;
+  video_type: string;
+  editing_style: string;
+  duration: string;
+  base_price: number;
+  deadline_days: number;
+  created_at: string;
+  users: {
+    full_name: string;
+    username: string;
+    profile_photo_url?: string;
+  };
+  _count?: {
+    applications: number;
+  };
+}
 
 interface ProjectCardProps {
-  project: {
-    id: string;
-    title: string;
-    description: string;
-    video_type: string;
-    editing_style: string;
-    duration: string;
-    base_price: number;
-    deadline_days: number;
-    created_at: string;
-    users: {
-      full_name: string;
-      username: string;
-      profile_photo_url?: string;
-    };
-    _count?: {
-      applications: number;
-    };
-  };
+  project: Project;
   hasApplied: boolean;
   canApply: boolean;
   onApply: () => void;
 }
 
 const videoTypeLabels: Record<string, string> = {
+  reels: 'Reels/Shorts',
   youtube: 'YouTube',
-  tiktok: 'TikTok',
-  instagram: 'Instagram',
-  podcast: 'Podcast',
-  corporate: 'Corporativo',
-  advertisement: 'Publicitário',
-  other: 'Outro',
+  motion: 'Motion Design',
 };
 
 const editingStyleLabels: Record<string, string> = {
-  dynamic: 'Dinâmico',
-  minimalist: 'Minimalista',
-  cinematic: 'Cinemático',
-  commercial: 'Comercial',
-  documentary: 'Documentário',
-  creative: 'Criativo',
+  lofi: 'Lofi',
+  dynamic: 'Dinâmica',
+  pro: 'Profissional',
+  motion: 'Motion Graphics',
 };
 
 const durationLabels: Record<string, string> = {
-  'short': '< 1 min',
-  'medium': '1-5 min',
-  'long': '5-15 min',
-  'very_long': '> 15 min',
+  '30s': '30 segundos',
+  '1m': '1 minuto',
+  '2m': '2 minutos',
+  '5m': '5+ minutos',
 };
 
-const ProjectCard: React.FC<ProjectCardProps> = ({
-  project,
-  hasApplied,
-  canApply,
-  onApply,
-}) => {
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
+function getTimeAgo(date: string) {
+  const now = new Date();
+  const created = new Date(date);
+  const diffInHours = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60));
 
+  if (diffInHours < 1) return 'Agora há pouco';
+  if (diffInHours < 24) return `${diffInHours}h atrás`;
+  
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays === 1) return 'Ontem';
+  if (diffInDays < 7) return `${diffInDays} dias atrás`;
+  
+  return created.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+const ProjectCard: React.FC<ProjectCardProps> = ({ project, hasApplied, canApply, onApply }) => {
   const applicationCount = project._count?.applications || 0;
   const isFull = applicationCount >= 5;
 
   return (
-    <Card className="p-6 hover:shadow-lg transition-shadow">
-      <div className="space-y-4">
-        {/* Header - Creator Info */}
-        <div className="flex items-start gap-3">
-          <Avatar className="w-10 h-10">
-            <AvatarImage src={project.users.profile_photo_url} />
-            <AvatarFallback className="text-xs bg-primary/10 text-primary">
-              {getInitials(project.users.full_name)}
-            </AvatarFallback>
-          </Avatar>
+    <div className="bg-card rounded-lg border border-border hover:border-primary/50 hover:shadow-md transition-all duration-200">
+      {/* Header */}
+      <div className="p-4 border-b border-border">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <h3
+            className="font-semibold text-foreground line-clamp-2 cursor-pointer hover:text-primary transition-colors"
+            onClick={onApply}
+          >
+            {project.title}
+          </h3>
           
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-foreground truncate">
-              {project.users.full_name}
-            </p>
-            <p className="text-sm text-muted-foreground truncate">
-              @{project.users.username}
-            </p>
-          </div>
-
           {hasApplied && (
-            <Badge variant="secondary" className="shrink-0">
+            <Badge variant="success" size="small">
               <CheckCircle className="w-3 h-3 mr-1" />
-              Candidatou
+              Candidatado
             </Badge>
           )}
         </div>
 
-        {/* Title */}
-        <div>
-          <h3 className="text-lg font-semibold text-foreground mb-2 line-clamp-2">
-            {project.title}
-          </h3>
-          <p className="text-sm text-muted-foreground line-clamp-3">
-            {project.description}
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+          {project.description}
+        </p>
 
-        {/* Tags */}
+        {/* Creator */}
+        <div className="flex items-center gap-2">
+          <Avatar
+            src={project.users.profile_photo_url}
+            alt={project.users.full_name}
+            size="small"
+            fallback={getInitials(project.users.full_name)}
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">
+              {project.users.full_name}
+            </p>
+            <p className="text-xs text-muted-foreground">@{project.users.username}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Details */}
+      <div className="p-4 space-y-3">
+        {/* Video Type & Style */}
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">
+          <Badge variant="default" size="small">
+            <Film className="w-3 h-3 mr-1" />
             {videoTypeLabels[project.video_type] || project.video_type}
           </Badge>
-          <Badge variant="outline">
+          <Badge variant="info" size="small">
+            <Sparkles className="w-3 h-3 mr-1" />
             {editingStyleLabels[project.editing_style] || project.editing_style}
           </Badge>
         </div>
 
         {/* Info Grid */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center gap-2 text-sm">
-            <DollarSign className="w-4 h-4 text-green-600" />
-            <span className="text-foreground font-medium">
-              R$ {project.base_price.toFixed(2)}
-            </span>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          {/* Duration */}
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Clock className="w-4 h-4 flex-shrink-0" />
+            <span>{durationLabels[project.duration] || project.duration}</span>
           </div>
 
-          <div className="flex items-center gap-2 text-sm">
-            <Calendar className="w-4 h-4 text-muted-foreground" />
-            <span className="text-muted-foreground">
-              {project.deadline_days} dias
-            </span>
+          {/* Deadline */}
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Calendar className="w-4 h-4 flex-shrink-0" />
+            <span>{project.deadline_days} dias</span>
           </div>
 
-          <div className="flex items-center gap-2 text-sm">
-            <Clock className="w-4 h-4 text-muted-foreground" />
-            <span className="text-muted-foreground">
-              {durationLabels[project.duration] || project.duration}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 text-sm">
-            <Users className="w-4 h-4 text-muted-foreground" />
-            <span className="text-muted-foreground">
-              {applicationCount}/5 candidatos
-            </span>
+          {/* Price */}
+          <div className="flex items-center gap-2 text-green-600 dark:text-green-400 font-semibold col-span-2">
+            <DollarSign className="w-4 h-4 flex-shrink-0" />
+            <span>R$ {project.base_price.toFixed(2).replace('.', ',')}</span>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-border">
-          <span className="text-xs text-muted-foreground">
-            {formatDistanceToNow(new Date(project.created_at), {
-              addSuffix: true,
-              locale: ptBR,
-            })}
-          </span>
-
-          <Button
-            size="sm"
-            onClick={onApply}
-            disabled={hasApplied || isFull || !canApply}
-          >
-            {hasApplied
-              ? 'Candidatura Enviada'
-              : isFull
-              ? 'Vagas Preenchidas'
-              : !canApply
-              ? 'Limite Atingido'
-              : 'Ver Detalhes'}
-          </Button>
+        {/* Applications Count */}
+        <div className="flex items-center justify-between text-sm pt-3 border-t border-border">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Users className="w-4 h-4" />
+            <span>
+              {applicationCount} candidatura{applicationCount !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <span className="text-xs text-muted-foreground">{getTimeAgo(project.created_at)}</span>
         </div>
       </div>
-    </Card>
+
+      {/* Footer Actions */}
+      <div className="p-4 pt-0">
+        {hasApplied ? (
+          <Button
+            variant="secondary"
+            size="medium"
+            fullWidth
+            onClick={onApply}
+          >
+            Ver Detalhes
+          </Button>
+        ) : isFull ? (
+          <Button
+            variant="ghost"
+            size="medium"
+            fullWidth
+            disabled
+          >
+            <Lock className="w-4 h-4 mr-2" />
+            Vagas Preenchidas
+          </Button>
+        ) : !canApply ? (
+          <Button
+            variant="ghost"
+            size="medium"
+            fullWidth
+            disabled
+          >
+            <Lock className="w-4 h-4 mr-2" />
+            Limite Atingido
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            size="medium"
+            fullWidth
+            onClick={onApply}
+          >
+            Ver Detalhes e Candidatar-se
+          </Button>
+        )}
+      </div>
+    </div>
   );
 };
 
