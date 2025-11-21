@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import Modal from '@/components/common/Modal';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
