@@ -13,7 +13,7 @@ import { Card } from '@/components/ui/card';
 import { useProjectPricing } from '@/hooks/useProjectPricing';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'lucide-react';
 
 type VideoType = 'reels' | 'motion' | 'youtube';
