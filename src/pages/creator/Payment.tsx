@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import Card from '@/components/common/Card';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 interface Project {
   id: string;
@@ -20,6 +20,39 @@ interface Project {
   payment_status: string;
 }
 
+// Error messages mapping
+const ERROR_MESSAGES: Record<string, string> = {
+  'card_declined': 'Cartão recusado. Tente outro cartão.',
+  'insufficient_funds': 'Saldo insuficiente. Verifique seu limite.',
+  'expired_card': 'Cartão expirado. Use um cartão válido.',
+  'incorrect_cvc': 'Código de segurança incorreto.',
+  'processing_error': 'Erro ao processar. Tente novamente em alguns minutos.',
+  'rate_limit': 'Muitas tentativas. Aguarde alguns minutos.',
+  'card_not_supported': 'Este cartão não é suportado.',
+  'network_error': 'Erro de conexão. Verifique sua internet.',
+};
+
+function getUserFriendlyError(error: any): string {
+  if (error?.code && ERROR_MESSAGES[error.code]) {
+    return ERROR_MESSAGES[error.code];
+  }
+  return error?.message || 'Erro desconhecido. Tente novamente.';
+}
+
+function logPaymentError(error: any, context: any) {
+  console.error('Payment Error:', {
+    message: error.message,
+    type: error.type,
+    code: error.code,
+    project_id: context.project_id,
+    amount: context.amount,
+    timestamp: new Date().toISOString()
+  });
+}
+
+const PAYMENT_TIMEOUT = 30000; // 30 seconds
+const MAX_RETRIES = 3;
+
 function CheckoutForm({ projectId, amount }: { projectId: string; amount: number }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -28,6 +61,42 @@ function CheckoutForm({ projectId, amount }: { projectId: string; amount: number
   
   const [processing, setProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [retries, setRetries] = useState(0);
+
+  const isNetworkError = (error: any) => {
+    return error?.type === 'api_connection_error' || 
+           error?.code === 'network_error' ||
+           error?.message?.toLowerCase().includes('network');
+  };
+
+  const confirmPaymentWithTimeout = async () => {
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Tempo esgotado. Tente novamente.')), PAYMENT_TIMEOUT);
+    });
+    
+    const paymentPromise = stripe!.confirmPayment({
+      elements: elements!,
+      confirmParams: {
+        return_url: `${window.location.origin}/creator/project/${projectId}/payment-success`,
+      },
+      redirect: 'if_required'
+    });
+    
+    return Promise.race([paymentPromise, timeoutPromise]) as Promise<any>;
+  };
+
+  const confirmPaymentWithRetry = async (): Promise<any> => {
+    try {
+      return await confirmPaymentWithTimeout();
+    } catch (error: any) {
+      if (retries < MAX_RETRIES && isNetworkError(error)) {
+        setRetries(prev => prev + 1);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retries + 1)));
+        return confirmPaymentWithRetry();
+      }
+      throw error;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,42 +109,59 @@ function CheckoutForm({ projectId, amount }: { projectId: string; amount: number
     setErrorMessage('');
 
     try {
-      const { error, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: `${window.location.origin}/creator/project/${projectId}/payment-success`,
-        },
-        redirect: 'if_required'
-      });
+      const result = await confirmPaymentWithRetry();
+      const { error, paymentIntent } = result;
 
       if (error) {
-        setErrorMessage(error.message || 'Erro ao processar pagamento');
+        const friendlyError = getUserFriendlyError(error);
+        setErrorMessage(friendlyError);
         setProcessing(false);
+        
+        logPaymentError(error, { project_id: projectId, amount });
         
         toast({
           title: 'Erro no pagamento',
-          description: error.message || 'Erro ao processar pagamento',
+          description: friendlyError,
           variant: 'destructive',
         });
-      } else if (paymentIntent && paymentIntent.status === 'requires_capture') {
-        toast({
-          title: 'Pagamento realizado!',
-          description: 'Seu projeto será publicado em breve.',
-        });
+      } else if (paymentIntent) {
+        // Handle 3D Secure
+        if (paymentIntent.status === 'requires_action') {
+          toast({
+            title: 'Autenticação necessária',
+            description: 'Complete a autenticação no popup do seu banco',
+          });
+          return;
+        }
         
-        navigate(`/creator/project/${projectId}/payment-success`);
+        if (paymentIntent.status === 'requires_capture' || paymentIntent.status === 'succeeded') {
+          toast({
+            title: 'Pagamento realizado!',
+            description: 'Seu projeto será publicado em breve.',
+          });
+          
+          navigate(`/creator/project/${projectId}/payment-success`);
+        }
       }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
-      setErrorMessage(errorMsg);
+    } catch (err: any) {
+      const friendlyError = getUserFriendlyError(err);
+      setErrorMessage(friendlyError);
       setProcessing(false);
+      
+      logPaymentError(err, { project_id: projectId, amount });
       
       toast({
         title: 'Erro no pagamento',
-        description: errorMsg,
+        description: friendlyError,
         variant: 'destructive',
       });
     }
+  };
+
+  const handleRetry = () => {
+    setErrorMessage('');
+    setProcessing(false);
+    setRetries(0);
   };
 
   return (
@@ -83,9 +169,10 @@ function CheckoutForm({ projectId, amount }: { projectId: string; amount: number
       <PaymentElement />
       
       {errorMessage && (
-        <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-          <p className="text-sm text-destructive">{errorMessage}</p>
-        </div>
+        <PaymentErrorFallback 
+          error={errorMessage}
+          onRetry={handleRetry}
+        />
       )}
       
       <Button
@@ -97,7 +184,7 @@ function CheckoutForm({ projectId, amount }: { projectId: string; amount: number
         {processing ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Processando...
+            {retries > 0 ? `Tentativa ${retries + 1}/${MAX_RETRIES + 1}...` : 'Processando...'}
           </>
         ) : (
           `Pagar R$ ${amount.toFixed(2)}`
@@ -108,6 +195,48 @@ function CheckoutForm({ projectId, amount }: { projectId: string; amount: number
         🔒 Pagamento seguro e criptografado via Stripe
       </p>
     </form>
+  );
+}
+
+function PaymentErrorFallback({ error, onRetry }: { error: string; onRetry: () => void }) {
+  return (
+    <div className="p-6 bg-destructive/10 border border-destructive/20 rounded-lg">
+      <div className="flex items-start gap-3 mb-4">
+        <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <h4 className="font-semibold text-destructive mb-1">Erro no Pagamento</h4>
+          <p className="text-sm text-destructive/90">{error}</p>
+        </div>
+      </div>
+      
+      <div className="mb-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRetry}
+          className="w-full"
+        >
+          🔄 Tentar Outro Cartão
+        </Button>
+      </div>
+      
+      <div className="p-4 bg-background rounded-lg">
+        <p className="text-xs font-semibold mb-2">💡 Dicas:</p>
+        <ul className="text-xs text-muted-foreground space-y-1">
+          <li>• Verifique se há saldo suficiente</li>
+          <li>• Confira os dados do cartão</li>
+          <li>• Tente outro cartão ou PIX</li>
+          <li>• Entre em contato com seu banco</li>
+        </ul>
+      </div>
+      
+      <p className="text-xs text-muted-foreground text-center mt-4">
+        Se o problema persistir:{' '}
+        <a href="mailto:suporte@frameup.com" className="text-primary underline">
+          suporte@frameup.com
+        </a>
+      </p>
+    </div>
   );
 }
 
