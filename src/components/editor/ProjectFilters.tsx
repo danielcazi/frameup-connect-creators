@@ -1,9 +1,5 @@
-import React from 'react';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { DollarSign, Clock, Film, Sparkles, X } from 'lucide-react';
 
 interface Filters {
   videoType: string[];
@@ -21,154 +17,188 @@ interface ProjectFiltersProps {
   hasActiveFilters: boolean;
 }
 
-const videoTypes = [
+const VIDEO_TYPES = [
+  { value: 'reels', label: 'Reels/Shorts' },
   { value: 'youtube', label: 'YouTube' },
-  { value: 'tiktok', label: 'TikTok' },
-  { value: 'instagram', label: 'Instagram' },
-  { value: 'podcast', label: 'Podcast' },
-  { value: 'corporate', label: 'Corporativo' },
-  { value: 'advertisement', label: 'Publicitário' },
+  { value: 'motion', label: 'Motion Design' },
 ];
 
-const editingStyles = [
-  { value: 'dynamic', label: 'Dinâmico' },
-  { value: 'minimalist', label: 'Minimalista' },
-  { value: 'cinematic', label: 'Cinemático' },
-  { value: 'commercial', label: 'Comercial' },
-  { value: 'documentary', label: 'Documentário' },
-  { value: 'creative', label: 'Criativo' },
+const EDITING_STYLES = [
+  { value: 'lofi', label: 'Lofi' },
+  { value: 'dynamic', label: 'Dinâmica' },
+  { value: 'pro', label: 'Profissional' },
+  { value: 'motion', label: 'Motion Graphics' },
 ];
 
-const ProjectFilters: React.FC<ProjectFiltersProps> = ({
+const DEADLINE_OPTIONS = [
+  { value: 3, label: 'Até 3 dias' },
+  { value: 7, label: 'Até 7 dias' },
+  { value: 15, label: 'Até 15 dias' },
+  { value: 30, label: 'Até 30 dias' },
+];
+
+function ProjectFilters({
   filters,
   onFilterChange,
   onClearFilters,
   hasActiveFilters,
-}) => {
-  const handleVideoTypeToggle = (value: string) => {
-    const newTypes = filters.videoType.includes(value)
-      ? filters.videoType.filter(t => t !== value)
-      : [...filters.videoType, value];
-    onFilterChange({ videoType: newTypes });
-  };
-
-  const handleEditingStyleToggle = (value: string) => {
-    const newStyles = filters.editingStyle.includes(value)
-      ? filters.editingStyle.filter(s => s !== value)
-      : [...filters.editingStyle, value];
-    onFilterChange({ editingStyle: newStyles });
-  };
+}: ProjectFiltersProps) {
+  function toggleArrayFilter(key: 'videoType' | 'editingStyle', value: string) {
+    const current = filters[key];
+    const newValue = current.includes(value)
+      ? current.filter((v) => v !== value)
+      : [...current, value];
+    onFilterChange({ [key]: newValue });
+  }
 
   return (
-    <div className="mt-4 pt-4 border-t border-border">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Video Type */}
-        <div>
-          <h3 className="font-semibold text-foreground mb-3">Tipo de Vídeo</h3>
-          <div className="space-y-2">
-            {videoTypes.map((type) => (
-              <div key={type.value} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`video-${type.value}`}
-                  checked={filters.videoType.includes(type.value)}
-                  onCheckedChange={() => handleVideoTypeToggle(type.value)}
-                />
-                <Label
-                  htmlFor={`video-${type.value}`}
-                  className="text-sm font-normal cursor-pointer"
-                >
-                  {type.label}
-                </Label>
-              </div>
-            ))}
-          </div>
+    <div className="mt-4 pt-4 border-t border-border space-y-6">
+      {/* Tipo de Vídeo */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Film className="w-4 h-4 text-muted-foreground" />
+          <label className="text-sm font-medium text-foreground">
+            Tipo de Vídeo
+          </label>
         </div>
-
-        {/* Editing Style */}
-        <div>
-          <h3 className="font-semibold text-foreground mb-3">Estilo de Edição</h3>
-          <div className="space-y-2">
-            {editingStyles.map((style) => (
-              <div key={style.value} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`style-${style.value}`}
-                  checked={filters.editingStyle.includes(style.value)}
-                  onCheckedChange={() => handleEditingStyleToggle(style.value)}
-                />
-                <Label
-                  htmlFor={`style-${style.value}`}
-                  className="text-sm font-normal cursor-pointer"
-                >
-                  {style.label}
-                </Label>
-              </div>
-            ))}
-          </div>
+        <div className="flex flex-wrap gap-2">
+          {VIDEO_TYPES.map((type) => (
+            <button
+              key={type.value}
+              onClick={() => toggleArrayFilter('videoType', type.value)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                filters.videoType.includes(type.value)
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground hover:bg-muted/80'
+              }`}
+            >
+              {type.label}
+            </button>
+          ))}
         </div>
+      </div>
 
-        {/* Budget Range */}
-        <div>
-          <h3 className="font-semibold text-foreground mb-3">Orçamento</h3>
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm text-muted-foreground mb-2 block">
-                Mínimo: R$ {filters.minBudget.toFixed(2)}
-              </Label>
-              <Slider
-                value={[filters.minBudget]}
-                onValueChange={([value]) => onFilterChange({ minBudget: value })}
-                min={0}
-                max={10000}
-                step={100}
-              />
-            </div>
-            <div>
-              <Label className="text-sm text-muted-foreground mb-2 block">
-                Máximo: R$ {filters.maxBudget.toFixed(2)}
-              </Label>
-              <Slider
-                value={[filters.maxBudget]}
-                onValueChange={([value]) => onFilterChange({ maxBudget: value })}
-                min={0}
-                max={10000}
-                step={100}
-              />
-            </div>
-          </div>
+      {/* Estilo de Edição */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="w-4 h-4 text-muted-foreground" />
+          <label className="text-sm font-medium text-foreground">
+            Estilo de Edição
+          </label>
         </div>
+        <div className="flex flex-wrap gap-2">
+          {EDITING_STYLES.map((style) => (
+            <button
+              key={style.value}
+              onClick={() => toggleArrayFilter('editingStyle', style.value)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                filters.editingStyle.includes(style.value)
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground hover:bg-muted/80'
+              }`}
+            >
+              {style.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-        {/* Deadline */}
-        <div>
-          <h3 className="font-semibold text-foreground mb-3">Prazo</h3>
-          <div className="space-y-2">
-            <Label className="text-sm text-muted-foreground mb-2 block">
-              Até {filters.maxDeadline} dias
-            </Label>
-            <Slider
-              value={[filters.maxDeadline]}
-              onValueChange={([value]) => onFilterChange({ maxDeadline: value })}
-              min={1}
-              max={30}
-              step={1}
+      {/* Orçamento */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <DollarSign className="w-4 h-4 text-muted-foreground" />
+          <label className="text-sm font-medium text-foreground">
+            Faixa de Orçamento
+          </label>
+        </div>
+        <div className="space-y-3">
+          {/* Min Budget */}
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">
+              Mínimo: R$ {filters.minBudget.toFixed(2)}
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="5000"
+              step="50"
+              value={filters.minBudget}
+              onChange={(e) =>
+                onFilterChange({ minBudget: Number(e.target.value) })
+              }
+              className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
             />
           </div>
 
-          {/* Clear Filters Button */}
-          {hasActiveFilters && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onClearFilters}
-              className="w-full mt-6"
-            >
-              <X className="w-4 h-4 mr-2" />
-              Limpar Filtros
-            </Button>
-          )}
+          {/* Max Budget */}
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">
+              Máximo: R$ {filters.maxBudget.toFixed(2)}
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="10000"
+              step="100"
+              value={filters.maxBudget}
+              onChange={(e) =>
+                onFilterChange({ maxBudget: Number(e.target.value) })
+              }
+              className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+            />
+          </div>
+
+          <div className="text-center text-sm text-muted-foreground bg-muted py-2 rounded-lg">
+            R$ {filters.minBudget.toFixed(2)} - R$ {filters.maxBudget.toFixed(2)}
+          </div>
         </div>
+      </div>
+
+      {/* Prazo */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Clock className="w-4 h-4 text-muted-foreground" />
+          <label className="text-sm font-medium text-foreground">
+            Prazo Máximo
+          </label>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {DEADLINE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => onFilterChange({ maxDeadline: option.value })}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filters.maxDeadline === option.value
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground hover:bg-muted/80'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center justify-between pt-4 border-t border-border">
+        <p className="text-sm text-muted-foreground">
+          {hasActiveFilters ? 'Filtros aplicados' : 'Sem filtros ativos'}
+        </p>
+        
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClearFilters}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X className="w-4 h-4 mr-1" />
+            Limpar Tudo
+          </Button>
+        )}
       </div>
     </div>
   );
-};
+}
 
 export default ProjectFilters;
