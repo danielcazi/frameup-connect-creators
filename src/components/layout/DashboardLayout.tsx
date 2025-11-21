@@ -12,6 +12,7 @@ import {
   X
 } from 'lucide-react';
 import Badge from '@/components/common/Badge';
+import SubscriptionBanner from '@/components/editor/SubscriptionBanner';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -81,6 +82,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Subscription Banner (Editor Only) */}
+      {userType === 'editor' && <SubscriptionBanner />}
+      
       {/* Mobile Menu Button */}
       <button
         onClick={() => setIsMobileSidebarOpen(true)}
