@@ -10,6 +10,8 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import RecoverPassword from "./pages/RecoverPassword";
 import CreatorDashboard from "./pages/creator/Dashboard";
+import NewProject from "./pages/creator/NewProject";
+import ProjectPreview from "./pages/creator/ProjectPreview";
 import EditorDashboard from "./pages/editor/Dashboard";
 import EditorPricing from "./pages/editor/Pricing";
 import NotFound from "./pages/NotFound";
@@ -36,6 +38,22 @@ const App = () => (
               element={
                 <ProtectedRoute requiredUserType="creator">
                   <CreatorDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/creator/new-project"
+              element={
+                <ProtectedRoute requiredUserType="creator">
+                  <NewProject />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/creator/project/:id/payment"
+              element={
+                <ProtectedRoute requiredUserType="creator">
+                  <ProjectPreview />
                 </ProtectedRoute>
               }
             />
