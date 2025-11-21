@@ -228,11 +228,11 @@ export default function NewProject() {
       
       toast({
         title: 'Projeto salvo!',
-        description: 'Redirecionando para pagamento...'
+        description: 'Redirecionando para revisão...'
       });
       
-      // Redirecionar para página de pagamento
-      navigate(`/creator/project/${result.project.id}/payment`);
+      // Redirecionar para página de preview
+      navigate(`/creator/project/${result.project.id}/preview`);
     } catch (error: any) {
       toast({
         variant: 'destructive',

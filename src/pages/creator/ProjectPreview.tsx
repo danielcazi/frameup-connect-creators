@@ -308,14 +308,7 @@ export default function ProjectPreview() {
   }, [id, user, navigate, toast]);
 
   const handlePayment = async (projectId: string) => {
-    // TODO: Implementar integração com Stripe na Fase 4
-    toast({
-      title: 'Pagamento em desenvolvimento',
-      description: 'A integração com Stripe será implementada na próxima fase.',
-    });
-    
-    // Por enquanto, apenas simular sucesso
-    // navigate(`/creator/project/${projectId}/success`);
+    navigate(`/creator/project/${projectId}/payment`);
   };
 
   if (loading) {
