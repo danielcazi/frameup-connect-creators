@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { ProgressSteps } from '@/components/creator/ProgressSteps';
 import { VideoTypeCard } from '@/components/creator/VideoTypeCard';
 import { EditingStyleCard } from '@/components/creator/EditingStyleCard';
 import { DurationCard } from '@/components/creator/DurationCard';
+import { PricingSummaryCard } from '@/components/creator/PricingSummaryCard';
 import { Button } from '@/components/ui/button';
+import { useProjectPricing } from '@/hooks/useProjectPricing';
+import { useToast } from '@/hooks/use-toast';
 
 type VideoType = 'reels' | 'motion' | 'youtube';
 type EditingStyle = 'lofi' | 'dynamic' | 'pro' | 'motion';
@@ -34,6 +37,7 @@ interface ProjectData {
 
 export default function NewProject() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [projectData, setProjectData] = useState<ProjectData>({
     video_type: null,
@@ -51,13 +55,48 @@ export default function NewProject() {
     estimated_delivery_days: 0
   });
 
+  // Calcular preço automaticamente
+  const pricing = useProjectPricing(
+    projectData.video_type,
+    projectData.editing_style,
+    projectData.duration_category
+  );
+
+  // Atualizar projectData quando pricing mudar
+  useEffect(() => {
+    if (pricing.base_price > 0) {
+      setProjectData(prev => ({
+        ...prev,
+        pricing_id: pricing.pricing_id,
+        base_price: pricing.base_price,
+        platform_fee: pricing.platform_fee,
+        total_paid_by_creator: pricing.total_paid_by_creator,
+        estimated_delivery_days: pricing.estimated_delivery_days
+      }));
+    }
+  }, [pricing]);
+
+  // Mostrar erro de pricing
+  useEffect(() => {
+    if (pricing.error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao calcular preço',
+        description: pricing.error
+      });
+    }
+  }, [pricing.error, toast]);
+
   const updateProjectData = (updates: Partial<ProjectData>) => {
     setProjectData(prev => ({ ...prev, ...updates }));
   };
 
   const canProceedStep1 = projectData.video_type && 
                           projectData.editing_style && 
-                          projectData.duration_category;
+                          projectData.duration_category &&
+                          pricing.base_price > 0 &&
+                          !pricing.loading &&
+                          !pricing.error;
 
   const handleContinue = () => {
     if (!canProceedStep1) {
@@ -77,9 +116,10 @@ export default function NewProject() {
         <ProgressSteps currentStep={step} totalSteps={2} />
         
         {step === 1 && (
-          <div className="space-y-8 animate-fade-in">
-            {/* Tipo de Vídeo */}
-            <section>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-8 animate-fade-in">
+              {/* Tipo de Vídeo */}
+              <section>
               <h3 className="text-lg font-semibold mb-4 text-foreground">
                 1. Escolha o Tipo de Vídeo
               </h3>
@@ -198,29 +238,37 @@ export default function NewProject() {
               </section>
             )}
             
-            {/* Botões de Navegação */}
-            <div className="flex justify-between pt-6 border-t border-border">
-              <Button 
-                variant="outline" 
-                onClick={() => navigate('/creator/dashboard')}
-              >
-                Cancelar
-              </Button>
+              {/* Botões de Navegação */}
+              <div className="flex justify-between pt-6 border-t border-border">
+                <Button 
+                  variant="outline" 
+                  onClick={() => navigate('/creator/dashboard')}
+                >
+                  Cancelar
+                </Button>
+                
+                <Button
+                  variant="default"
+                  disabled={!canProceedStep1}
+                  onClick={handleContinue}
+                >
+                  Continuar para Detalhes →
+                </Button>
+              </div>
               
-              <Button
-                variant="default"
-                disabled={!canProceedStep1}
-                onClick={handleContinue}
-              >
-                Continuar para Detalhes →
-              </Button>
+              {!canProceedStep1 && (projectData.video_type || projectData.editing_style || projectData.duration_category) && (
+                <p className="text-sm text-muted-foreground text-center mt-4">
+                  {pricing.loading ? 'Calculando preço...' : 'Complete todos os campos para continuar'}
+                </p>
+              )}
             </div>
-            
-            {!canProceedStep1 && (projectData.video_type || projectData.editing_style || projectData.duration_category) && (
-              <p className="text-sm text-muted-foreground text-center mt-4">
-                Complete todos os campos para continuar
-              </p>
-            )}
+
+            {/* Sidebar com Resumo de Preço */}
+            <div className="lg:col-span-1">
+              <div className="sticky top-24">
+                <PricingSummaryCard pricing={pricing} />
+              </div>
+            </div>
           </div>
         )}
         
