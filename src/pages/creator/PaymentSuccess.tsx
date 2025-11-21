@@ -6,7 +6,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import Badge from '@/components/common/Badge';
-import { CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 
 interface Project {
   id: string;
@@ -23,6 +23,8 @@ function PaymentSuccess() {
   const { user } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showManualCheck, setShowManualCheck] = useState(false);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
   useEffect(() => {
     async function checkPaymentStatus() {
@@ -31,29 +33,40 @@ function PaymentSuccess() {
         return;
       }
 
-      // Wait for webhook to process (may take 1-2 seconds)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const MAX_ATTEMPTS = 10;
+      const DELAY_MS = 2000;
 
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('id', id)
-        .eq('creator_id', user.id)
-        .single();
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        // Wait before checking
+        await new Promise(resolve => setTimeout(resolve, DELAY_MS));
 
-      if (error || !data) {
-        console.error('Error fetching project:', error);
-        navigate('/creator/dashboard');
-        return;
+        const { data, error } = await supabase
+          .from('projects')
+          .select('id, title, total_paid_by_creator, status, payment_status, stripe_payment_intent_id')
+          .eq('id', id)
+          .eq('creator_id', user.id)
+          .single();
+
+        if (error || !data) {
+          console.error('Error fetching project:', error);
+          continue;
+        }
+
+        setProject(data);
+
+        // Check if payment was confirmed by webhook
+        if (data.payment_status === 'paid' && data.status === 'open') {
+          setPaymentConfirmed(true);
+          setLoading(false);
+          return;
+        }
+
+        // Show progress to user
+        console.log(`Checking payment status... Attempt ${attempt + 1}/${MAX_ATTEMPTS}`);
       }
 
-      // Verify payment was successful
-      if (data.payment_status !== 'paid') {
-        navigate(`/creator/project/${id}/payment`);
-        return;
-      }
-
-      setProject(data);
+      // After max attempts, show manual check message
+      setShowManualCheck(true);
       setLoading(false);
     }
 
@@ -62,12 +75,92 @@ function PaymentSuccess() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
-          <p className="text-lg text-muted-foreground">Confirmando pagamento...</p>
+      <DashboardLayout 
+        userType="creator"
+        title="Confirmando Pagamento"
+        subtitle="Aguarde enquanto verificamos seu pagamento"
+      >
+        <div className="min-h-[400px] flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
+            <p className="text-lg text-muted-foreground">Confirmando pagamento...</p>
+            <p className="text-xs text-muted-foreground mt-2">Isso pode levar alguns segundos</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Show manual check message if webhook failed
+  if (showManualCheck && !paymentConfirmed) {
+    return (
+      <DashboardLayout 
+        userType="creator"
+        title="Pagamento em Processamento"
+        subtitle="Estamos confirmando seu pagamento"
+      >
+        <div className="max-w-2xl mx-auto py-12 px-4">
+          <Card variant="default" padding="large" className="text-center">
+            <div className="mb-6">
+              <div className="w-20 h-20 bg-yellow-100 dark:bg-yellow-900/20 rounded-full flex items-center justify-center mx-auto">
+                <AlertCircle className="w-10 h-10 text-yellow-600 dark:text-yellow-400" />
+              </div>
+            </div>
+
+            <h1 className="text-2xl font-bold text-foreground mb-3">
+              Pagamento em Processamento
+            </h1>
+            
+            <p className="text-muted-foreground mb-6">
+              Seu pagamento foi realizado com sucesso, mas ainda estamos confirmando com o banco.
+              Isso pode levar alguns minutos.
+            </p>
+
+            <div className="p-4 bg-primary/10 rounded-lg mb-6 text-left">
+              <p className="text-sm font-semibold mb-2 text-foreground">✅ O que já foi feito:</p>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Seu pagamento foi processado com sucesso</li>
+                <li>• O valor está reservado em nossa plataforma</li>
+                <li>• Você receberá um email de confirmação</li>
+              </ul>
+            </div>
+
+            <div className="p-4 bg-muted/50 rounded-lg mb-6 text-left">
+              <p className="text-sm font-semibold mb-2 text-foreground">⏳ Próximos passos:</p>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Aguarde alguns minutos para a confirmação final</li>
+                <li>• Recarregue esta página para verificar o status</li>
+                <li>• Se necessário, entre em contato com o suporte</li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button
+                variant="primary"
+                size="large"
+                onClick={() => window.location.reload()}
+              >
+                🔄 Recarregar Página
+              </Button>
+              
+              <Button
+                variant="secondary"
+                size="large"
+                onClick={() => navigate('/creator/dashboard')}
+              >
+                Ir para Dashboard
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground mt-6">
+              Precisa de ajuda?{' '}
+              <a href="mailto:suporte@frameup.com" className="text-primary underline">
+                suporte@frameup.com
+              </a>
+            </p>
+          </Card>
+        </div>
+      </DashboardLayout>
     );
   }
 
