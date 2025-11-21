@@ -16,6 +16,7 @@ import Payment from "./pages/creator/Payment";
 import PaymentSuccess from "./pages/creator/PaymentSuccess";
 import EditorDashboard from "./pages/editor/Dashboard";
 import EditorPricing from "./pages/editor/Pricing";
+import SubscriptionPlans from "./pages/editor/SubscriptionPlans";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -90,6 +91,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredUserType="editor">
                   <EditorPricing />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/editor/subscription/plans"
+              element={
+                <ProtectedRoute requiredUserType="editor">
+                  <SubscriptionPlans />
                 </ProtectedRoute>
               }
             />
