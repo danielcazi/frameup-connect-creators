@@ -12,6 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { useProjectPricing } from '@/hooks/useProjectPricing';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 import { Link } from 'lucide-react';
 
 type VideoType = 'reels' | 'motion' | 'youtube';
@@ -48,11 +50,66 @@ const isValidUrl = (url: string): boolean => {
   }
 };
 
+async function saveProjectDraft(projectData: ProjectData, creatorId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('projects')
+      .insert({
+        creator_id: creatorId,
+        pricing_id: projectData.pricing_id,
+        
+        // Informações do projeto
+        title: projectData.title,
+        description: projectData.description,
+        video_type: projectData.video_type,
+        editing_style: projectData.editing_style,
+        duration_category: projectData.duration_category,
+        
+        // Materiais e referências
+        reference_files_url: projectData.reference_files_url,
+        context_description: projectData.context_description || null,
+        reference_links: projectData.reference_links || null,
+        
+        // Valores
+        base_price: projectData.base_price,
+        platform_fee_percentage: 5,
+        platform_fee: projectData.platform_fee,
+        total_paid_by_creator: projectData.total_paid_by_creator,
+        editor_receives: projectData.base_price,
+        
+        // Configurações
+        max_applications: 5,
+        current_applications: 0,
+        max_revisions: 3,
+        current_revisions: 0,
+        estimated_delivery_days: projectData.estimated_delivery_days,
+        
+        // Status
+        status: 'draft',
+        payment_status: 'pending'
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return { success: true, project: data };
+  } catch (error: any) {
+    console.error('Erro ao salvar projeto:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Erro ao salvar projeto' 
+    };
+  }
+}
+
 export default function NewProject() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
   const [projectData, setProjectData] = useState<ProjectData>({
     video_type: null,
     editing_style: null,
@@ -145,14 +202,45 @@ export default function NewProject() {
     setErrors({});
   };
 
-  const handleSubmit = () => {
-    if (validateStep2()) {
-      // TODO: Navigate to payment or save project
+  const handleSubmit = async () => {
+    if (!validateStep2()) {
+      return;
+    }
+    
+    if (!user?.id) {
       toast({
-        title: 'Projeto criado!',
+        variant: 'destructive',
+        title: 'Erro de autenticação',
+        description: 'Você precisa estar logado para criar um projeto.'
+      });
+      navigate('/login');
+      return;
+    }
+    
+    setSaving(true);
+    
+    try {
+      const result = await saveProjectDraft(projectData, user.id);
+      
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      
+      toast({
+        title: 'Projeto salvo!',
         description: 'Redirecionando para pagamento...'
       });
-      // navigate('/creator/project/payment');
+      
+      // Redirecionar para página de pagamento
+      navigate(`/creator/project/${result.project.id}/payment`);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao salvar projeto',
+        description: error.message || 'Erro ao salvar projeto. Tente novamente.'
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -456,12 +544,20 @@ export default function NewProject() {
             
             {/* Botões de Navegação */}
             <div className="flex justify-between pt-6 border-t border-border">
-              <Button variant="outline" onClick={handleBack}>
+              <Button 
+                variant="outline" 
+                onClick={handleBack}
+                disabled={saving}
+              >
                 ← Voltar
               </Button>
               
-              <Button variant="default" onClick={handleSubmit}>
-                Ir para Pagamento →
+              <Button 
+                variant="default" 
+                onClick={handleSubmit}
+                disabled={saving}
+              >
+                {saving ? 'Salvando...' : 'Ir para Pagamento →'}
               </Button>
             </div>
           </div>
