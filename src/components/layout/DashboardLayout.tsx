@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import { NavLink } from '@/components/NavLink';
 import { cn } from '@/lib/utils';
-import { 
-  Home, 
-  FolderOpen, 
-  Users, 
-  MessageSquare, 
-  User, 
+import {
+  Home,
+  FolderOpen,
+  Users,
+  MessageSquare,
+  User,
   CreditCard,
   Menu,
   X
 } from 'lucide-react';
 import Badge from '@/components/common/Badge';
+import SubscriptionBanner from '@/components/editor/SubscriptionBanner';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -38,20 +39,20 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Define navigation items based on user type
-  const navItems: NavItem[] = userType === 'creator' 
+  const navItems: NavItem[] = userType === 'creator'
     ? [
-        { label: 'Dashboard', path: '/creator/dashboard', icon: Home },
-        { label: 'Meus Projetos', path: '/creator/projects', icon: FolderOpen },
-        { label: 'Editores', path: '/creator/editors', icon: Users },
-        { label: 'Mensagens', path: '/creator/messages', icon: MessageSquare, badge: 0 },
-      ]
+      { label: 'Dashboard', path: '/creator/dashboard', icon: Home },
+      { label: 'Meus Projetos', path: '/creator/projects', icon: FolderOpen },
+      { label: 'Editores', path: '/creator/editors', icon: Users },
+      { label: 'Mensagens', path: '/creator/messages', icon: MessageSquare, badge: 0 },
+    ]
     : [
-        { label: 'Dashboard', path: '/editor/dashboard', icon: Home },
-        { label: 'Meus Projetos', path: '/editor/projects', icon: FolderOpen },
-        { label: 'Perfil', path: '/editor/profile', icon: User },
-        { label: 'Assinatura', path: '/editor/pricing', icon: CreditCard },
-        { label: 'Mensagens', path: '/editor/messages', icon: MessageSquare, badge: 0 },
-      ];
+      { label: 'Dashboard', path: '/editor/dashboard', icon: Home },
+      { label: 'Meus Projetos', path: '/editor/projects', icon: FolderOpen },
+      { label: 'Perfil', path: '/editor/profile', icon: User },
+      { label: 'Assinatura', path: '/editor/subscription/manage', icon: CreditCard },
+      { label: 'Mensagens', path: '/editor/messages', icon: MessageSquare, badge: 0 },
+    ];
 
   const SidebarContent = () => (
     <nav className="space-y-1">
@@ -81,6 +82,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Subscription Banner */}
+      <SubscriptionBanner />
+
       {/* Mobile Menu Button */}
       <button
         onClick={() => setIsMobileSidebarOpen(true)}

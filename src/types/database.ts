@@ -1,24 +1,24 @@
 export type UserType = 'creator' | 'editor';
 
-export type ProjectStatus = 
-  | 'draft' 
-  | 'open' 
-  | 'in_progress' 
-  | 'in_review' 
-  | 'completed' 
+export type ProjectStatus =
+  | 'draft'
+  | 'open'
+  | 'in_progress'
+  | 'in_review'
+  | 'completed'
   | 'cancelled';
 
-export type PaymentStatus = 
-  | 'pending' 
-  | 'paid' 
-  | 'held' 
-  | 'released' 
+export type PaymentStatus =
+  | 'pending'
+  | 'paid'
+  | 'held'
+  | 'released'
   | 'refunded';
 
-export type SubscriptionStatus = 
-  | 'active' 
-  | 'past_due' 
-  | 'cancelled' 
+export type SubscriptionStatus =
+  | 'active'
+  | 'past_due'
+  | 'cancelled'
   | 'expired';
 
 export type SubscriptionPlan = 'basic' | 'pro';
@@ -94,5 +94,50 @@ export interface EditorSubscription {
   current_period_start: string;
   current_period_end: string;
   created_at: string;
+  updated_at: string;
+}
+
+// Admin System Types
+export type AdminRole = 'super_admin' | 'admin' | 'financial' | 'support';
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+
+export interface AdminUser {
+  id: string;
+  user_id: string;
+  role: AdminRole;
+  permissions: string[];
+  is_active: boolean;
+  department: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminActionLog {
+  id: string;
+  admin_id: string;
+  action_type: string;
+  target_type: string;
+  target_id: string;
+  action_details: Record<string, any>;
+  reason: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
+export interface UserMetadataExtension {
+  user_id: string;
+  approval_status: ApprovalStatus;
+  approval_notes: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  is_banned: boolean;
+  ban_reason: string | null;
+  banned_by: string | null;
+  banned_at: string | null;
+  bias_score: number;
+  total_warnings: number;
   updated_at: string;
 }

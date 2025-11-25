@@ -43,7 +43,7 @@ const signupSchema = z.object({
   // Editor-specific validations
   if (data.userType === 'editor') {
     const urlRegex = /(youtube\.com|youtu\.be|vimeo\.com|drive\.google\.com)/;
-    
+
     if (!data.portfolioVideo1 || !urlRegex.test(data.portfolioVideo1)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -51,7 +51,7 @@ const signupSchema = z.object({
         path: ['portfolioVideo1'],
       });
     }
-    
+
     if (!data.portfolioVideo2 || !urlRegex.test(data.portfolioVideo2)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -59,7 +59,7 @@ const signupSchema = z.object({
         path: ['portfolioVideo2'],
       });
     }
-    
+
     if (!data.portfolioVideo3 || !urlRegex.test(data.portfolioVideo3)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -67,7 +67,7 @@ const signupSchema = z.object({
         path: ['portfolioVideo3'],
       });
     }
-    
+
     if (!data.softwareSkills || data.softwareSkills.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -118,7 +118,7 @@ const Signup = () => {
     if (/[A-Z]/.test(pwd)) strength++;
     if (/[0-9]/.test(pwd)) strength++;
     if (/[^A-Za-z0-9]/.test(pwd)) strength++;
-    
+
     if (strength <= 2) return { label: 'Fraca', color: 'text-destructive' };
     if (strength === 3) return { label: 'Média', color: 'text-warning' };
     return { label: 'Forte', color: 'text-success' };
@@ -144,9 +144,9 @@ const Signup = () => {
       setUsernameStatus(null);
       return;
     }
-    
+
     setUsernameStatus('checking');
-    
+
     // Simulate API check
     setTimeout(() => {
       // Mock: usernames with 'admin' are taken
@@ -195,7 +195,7 @@ const Signup = () => {
 
   const onSubmit = async (data: SignupForm) => {
     setIsSubmitting(true);
-    
+
     try {
       const { data: authData, error } = await signUp(
         data.email,
@@ -226,7 +226,7 @@ const Signup = () => {
           });
           return;
         }
-        
+
         if (error.message.includes('already registered') || error.message.includes('já cadastrado')) {
           toast({
             title: 'Email já cadastrado',
@@ -235,7 +235,7 @@ const Signup = () => {
           });
           return;
         }
-        
+
         toast({
           title: 'Erro ao criar conta',
           description: error.message || 'Tente novamente mais tarde.',
@@ -307,11 +307,10 @@ const Signup = () => {
                 <button
                   type="button"
                   onClick={() => handleTypeSelect('creator')}
-                  className={`rounded-lg border-2 p-6 text-left transition-all ${
-                    selectedType === 'creator'
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border bg-background hover:border-primary/50'
-                  }`}
+                  className={`rounded-lg border-2 p-6 text-left transition-all ${selectedType === 'creator'
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border bg-background hover:border-primary/50'
+                    }`}
                 >
                   <div className="mb-3 text-4xl">📹</div>
                   <h3 className="mb-2 text-lg font-bold text-foreground">CREATOR</h3>
@@ -324,11 +323,10 @@ const Signup = () => {
                 <button
                   type="button"
                   onClick={() => handleTypeSelect('editor')}
-                  className={`rounded-lg border-2 p-6 text-left transition-all ${
-                    selectedType === 'editor'
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border bg-background hover:border-primary/50'
-                  }`}
+                  className={`rounded-lg border-2 p-6 text-left transition-all ${selectedType === 'editor'
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border bg-background hover:border-primary/50'
+                    }`}
                 >
                   <div className="mb-3 text-4xl">✂️</div>
                   <h3 className="mb-2 text-lg font-bold text-foreground">EDITOR</h3>
@@ -386,10 +384,10 @@ const Signup = () => {
                             errors.username
                               ? 'border-destructive pr-10'
                               : usernameStatus === 'available'
-                              ? 'border-success pr-10'
-                              : usernameStatus === 'taken'
-                              ? 'border-destructive pr-10'
-                              : 'pr-10'
+                                ? 'border-success pr-10'
+                                : usernameStatus === 'taken'
+                                  ? 'border-destructive pr-10'
+                                  : 'pr-10'
                           }
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -710,9 +708,9 @@ const Signup = () => {
                     </p>
                   )}
 
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
+                  <Button
+                    type="submit"
+                    className="w-full"
                     size="lg"
                     disabled={isSubmitting}
                   >

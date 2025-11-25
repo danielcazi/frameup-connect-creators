@@ -15,8 +15,13 @@ interface Project {
   id: string;
   title: string;
   status: string;
+  base_price: number;
+  deadline_days: number;
+  created_at: string;
   updated_at: string;
-  current_applications?: number;
+  _count?: {
+    applications: number;
+  };
   assigned_editor?: {
     full_name: string;
     username: string;
@@ -84,14 +89,46 @@ const CreatorDashboard = () => {
 
       if (error) throw error;
 
-      setProjects(data || []);
+      // Load application counts for each project
+      const projectIds = data?.map(p => p.id) || [];
+      let applicationCounts: Record<string, number> = {};
+
+      if (projectIds.length > 0) {
+        const { data: applicationsData } = await supabase
+          .from('project_applications')
+          .select('project_id')
+          .in('project_id', projectIds);
+
+        applicationCounts = applicationsData?.reduce((acc, app) => {
+          acc[app.project_id] = (acc[app.project_id] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>) || {};
+      }
+
+      // Load reviewed project IDs
+      const { data: reviewsData } = await supabase
+        .from('reviews')
+        .select('project_id')
+        .eq('reviewer_id', user.id);
+
+      const reviewedProjectIds = new Set(reviewsData?.map(r => r.project_id));
+
+      // Transform projects to include _count and has_reviewed
+      const projectsWithCounts = data?.map(project => ({
+        ...project,
+        _count: {
+          applications: applicationCounts[project.id] || 0
+        },
+        has_reviewed: reviewedProjectIds.has(project.id)
+      })) || [];
+
+      setProjects(projectsWithCounts);
 
       // Calculate metrics
-      const allProjects = data || [];
       setMetrics({
-        activeProjects: allProjects.filter(p => p.status === 'in_progress').length,
-        completedProjects: allProjects.filter(p => p.status === 'completed').length,
-        awaitingReview: allProjects.filter(p => p.status === 'in_review').length,
+        activeProjects: projectsWithCounts.filter(p => p.status === 'in_progress').length,
+        completedProjects: projectsWithCounts.filter(p => p.status === 'completed').length,
+        awaitingReview: projectsWithCounts.filter(p => p.status === 'in_review').length,
       });
     } catch (error) {
       console.error('Error fetching projects:', error);
@@ -136,7 +173,7 @@ const CreatorDashboard = () => {
           color="blue"
           subtitle="Em andamento"
         />
-        
+
         <MetricCard
           title="Projetos Concluídos"
           value={metrics.completedProjects}
@@ -144,7 +181,7 @@ const CreatorDashboard = () => {
           color="green"
           subtitle="Finalizados"
         />
-        
+
         <MetricCard
           title="Aguardando Revisão"
           value={metrics.awaitingReview}
@@ -157,7 +194,7 @@ const CreatorDashboard = () => {
       {/* Projects List Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <h2 className="text-xl font-semibold text-foreground">Todos os Projetos</h2>
-        
+
         <div className="flex gap-3 w-full sm:w-auto">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-[180px]">
@@ -171,7 +208,7 @@ const CreatorDashboard = () => {
               <SelectItem value="completed">Concluídos</SelectItem>
             </SelectContent>
           </Select>
-          
+
           <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="w-full sm:w-[150px]">
               <SelectValue placeholder="Ordenar" />
@@ -193,7 +230,7 @@ const CreatorDashboard = () => {
             <Skeleton className="h-32 w-full" />
           </>
         )}
-        
+
         {!loading && projects.length === 0 && (
           <EmptyState
             illustration="projects"
@@ -206,7 +243,7 @@ const CreatorDashboard = () => {
             }}
           />
         )}
-        
+
         {!loading && projects.map(project => (
           <ProjectCard key={project.id} project={project} />
         ))}

@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { NavLink } from '@/components/NavLink';
+import NotificationBell from '@/components/layout/NotificationBell';
+import MessagesBadge from '@/components/layout/MessagesBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -12,18 +14,13 @@ export const Header = () => {
   const { user, userType, signOut } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  
-  const notificationsRef = useRef<HTMLDivElement>(null);
+
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
-        setNotificationsOpen(false);
-      }
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setUserMenuOpen(false);
       }
@@ -62,16 +59,6 @@ export const Header = () => {
       .toUpperCase()
       .slice(0, 2);
   };
-
-  // Mock notifications data
-  const notifications = [
-    { id: 1, text: 'Novo editor se candidatou ao seu projeto', unread: true },
-    { id: 2, text: 'Projeto "Summer Vlog" foi concluído', unread: true },
-    { id: 3, text: 'Pagamento recebido - R$ 500,00', unread: false },
-  ];
-
-  const unreadNotifications = notifications.filter(n => n.unread).length;
-  const unreadMessages = 3; // Mock data
 
   return (
     <>
@@ -171,59 +158,12 @@ export const Header = () => {
                   )}
 
                   {/* Notifications */}
-                  <div className="relative hidden md:block" ref={notificationsRef}>
-                    <button
-                      onClick={() => setNotificationsOpen(!notificationsOpen)}
-                      className="relative rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                      <Bell className="h-5 w-5" />
-                      {unreadNotifications > 0 && (
-                        <Badge className="absolute -right-1 -top-1 h-5 w-5 rounded-full bg-error p-0 text-xs">
-                          {unreadNotifications}
-                        </Badge>
-                      )}
-                    </button>
-
-                    {/* Notifications Dropdown */}
-                    {notificationsOpen && (
-                      <div className="absolute right-0 top-full mt-2 w-80 animate-fade-in rounded-lg border border-border bg-card shadow-lg">
-                        <div className="border-b border-border p-4">
-                          <h3 className="font-semibold text-foreground">Notificações</h3>
-                        </div>
-                        <div className="max-h-96 overflow-y-auto">
-                          {notifications.map((notification) => (
-                            <div
-                              key={notification.id}
-                              className={cn(
-                                "border-b border-border p-4 transition-colors hover:bg-muted/50",
-                                notification.unread && "bg-primary/5"
-                              )}
-                            >
-                              <p className="text-sm text-foreground">{notification.text}</p>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="border-t border-border p-3 text-center">
-                          <button className="text-sm font-medium text-primary hover:underline">
-                            Ver todas
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <NotificationBell />
 
                   {/* Messages */}
-                  <button
-                    onClick={() => navigate('/messages')}
-                    className="relative hidden rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:block"
-                  >
-                    <MessageSquare className="h-5 w-5" />
-                    {unreadMessages > 0 && (
-                      <Badge className="absolute -right-1 -top-1 h-5 w-5 rounded-full bg-primary p-0 text-xs">
-                        {unreadMessages}
-                      </Badge>
-                    )}
-                  </button>
+                  <div className="hidden md:block">
+                    <MessagesBadge />
+                  </div>
 
                   {/* User Avatar Menu */}
                   <div className="relative hidden md:block" ref={userMenuRef}>
@@ -444,21 +384,18 @@ export const Header = () => {
                           <MessageSquare className="h-4 w-4" />
                           Mensagens
                         </span>
-                        {unreadMessages > 0 && (
-                          <Badge className="bg-primary">{unreadMessages}</Badge>
-                        )}
                       </button>
                       <button
-                        onClick={() => setMobileMenuOpen(false)}
+                        onClick={() => {
+                          navigate('/notifications');
+                          setMobileMenuOpen(false);
+                        }}
                         className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
                       >
                         <span className="flex items-center gap-3">
                           <Bell className="h-4 w-4" />
                           Notificações
                         </span>
-                        {unreadNotifications > 0 && (
-                          <Badge className="bg-error">{unreadNotifications}</Badge>
-                        )}
                       </button>
                     </div>
 

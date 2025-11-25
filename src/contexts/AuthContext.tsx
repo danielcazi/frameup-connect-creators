@@ -44,14 +44,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
           const type = session.user.user_metadata?.user_type as UserType;
           setUserType(type);
         } else {
           setUserType(null);
         }
-        
+
         setLoading(false);
       }
     );
@@ -60,12 +60,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         const type = session.user.user_metadata?.user_type as UserType;
         setUserType(type);
       }
-      
+
       setLoading(false);
     });
 
