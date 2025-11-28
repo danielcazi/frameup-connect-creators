@@ -38,12 +38,12 @@ function SubscriptionSuccess() {
         try {
             // Buscar assinatura criada
             const { data, error: subError } = await supabase
-                .from('user_subscriptions')
+                .from('editor_subscriptions')
                 .select(`
           *,
           subscription_plans (*)
         `)
-                .eq('user_id', user.id)
+                .eq('editor_id', user.id)
                 .eq('status', 'active')
                 .order('created_at', { ascending: false })
                 .limit(1)

@@ -1,5 +1,5 @@
 import React from 'react';
-import { FolderOpen, MessageSquare, Search, FileText } from 'lucide-react';
+import { FolderOpen, MessageSquare, Search, FileText, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -12,7 +12,7 @@ interface EmptyStateProps {
     onClick: () => void;
     variant?: 'default' | 'secondary' | 'outline';
   };
-  illustration?: 'projects' | 'messages' | 'search' | 'generic';
+  illustration?: 'projects' | 'messages' | 'search' | 'generic' | 'users';
   className?: string;
 }
 
@@ -21,6 +21,7 @@ const illustrations = {
   messages: <MessageSquare className="w-full h-full text-muted-foreground/30" />,
   search: <Search className="w-full h-full text-muted-foreground/30" />,
   generic: <FileText className="w-full h-full text-muted-foreground/30" />,
+  users: <Users className="w-full h-full text-muted-foreground/30" />,
 };
 
 const EmptyState: React.FC<EmptyStateProps> = ({

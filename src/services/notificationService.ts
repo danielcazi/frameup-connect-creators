@@ -85,12 +85,10 @@ export async function getNotifications(
             query = query.eq('is_read', false);
         }
 
-        // Filtrar expiradas
-        query = query.or('expires_at.is.null,expires_at.gt.now()');
-
         const { data, error } = await query;
 
         if (error) throw error;
+        // @ts-ignore
         return data || [];
     } catch (error) {
         console.error('Erro ao buscar notificações:', error);
@@ -104,10 +102,13 @@ export async function getNotifications(
 
 export async function getUnreadCount(): Promise<number> {
     try {
-        const { data, error } = await supabase.rpc('get_unread_notifications_count');
+        const { count, error } = await supabase
+            .from('notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('is_read', false);
 
         if (error) throw error;
-        return data || 0;
+        return count || 0;
     } catch (error) {
         console.error('Erro ao contar notificações:', error);
         return 0;

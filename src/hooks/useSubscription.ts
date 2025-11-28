@@ -26,15 +26,15 @@ export function useSubscription() {
 
         try {
             const { data, error } = await supabase
-                .from('user_subscriptions')
+                .from('editor_subscriptions')
                 .select(`
           *,
           subscription_plans (*)
         `)
-                .eq('user_id', user.id)
+                .eq('editor_id', user.id)
                 .order('created_at', { ascending: false })
                 .limit(1)
-                .single();
+                .maybeSingle();
 
             if (error && error.code !== 'PGRST116') {
                 throw error;

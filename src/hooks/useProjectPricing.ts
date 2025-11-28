@@ -57,7 +57,6 @@ export function useProjectPricing(
                     .eq('video_type', video_type)
                     .eq('editing_style', editing_style)
                     .eq('duration_category', duration_category)
-                    .eq('is_active', true)
                     .maybeSingle(); // Use maybeSingle instead of single to avoid error if not found
 
                 if (error) throw error;

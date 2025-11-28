@@ -23,6 +23,7 @@ interface Project {
     base_price: number;
     deadline_days: number;
     created_at: string;
+    status?: string;
     users: {
         full_name: string;
         username: string;
@@ -38,10 +39,27 @@ interface ProjectCardProps {
     hasApplied: boolean;
     canApply: boolean;
     onApply: () => void;
+    showStatus?: boolean;
 }
 
-function ProjectCard({ project, hasApplied, canApply, onApply }: ProjectCardProps) {
+function ProjectCard({ project, hasApplied, canApply, onApply, showStatus }: ProjectCardProps) {
     const navigate = useNavigate();
+
+    const statusLabels: Record<string, string> = {
+        open: 'Aberto',
+        in_progress: 'Em Andamento',
+        in_review: 'Em Revisão',
+        completed: 'Concluído',
+        cancelled: 'Cancelado',
+    };
+
+    const statusColors: Record<string, string> = {
+        open: 'bg-blue-500',
+        in_progress: 'bg-yellow-500',
+        in_review: 'bg-purple-500',
+        completed: 'bg-green-500',
+        cancelled: 'bg-red-500',
+    };
 
     const videoTypeLabels: Record<string, string> = {
         reels: 'Reels/Shorts',
@@ -93,10 +111,16 @@ function ProjectCard({ project, hasApplied, canApply, onApply }: ProjectCardProp
                         {project.title}
                     </h3>
 
-                    {hasApplied && (
+                    {hasApplied && !showStatus && (
                         <Badge className="bg-green-500 hover:bg-green-600 text-white shrink-0">
                             <CheckCircle className="w-3 h-3 mr-1" />
                             Candidatado
+                        </Badge>
+                    )}
+
+                    {showStatus && project.status && (
+                        <Badge className={`${statusColors[project.status] || 'bg-gray-500'} text-white shrink-0`}>
+                            {statusLabels[project.status] || project.status}
                         </Badge>
                     )}
                 </div>

@@ -35,6 +35,7 @@ export interface DashboardOverview {
         avg_creator_rating: number;
         avg_editor_rating: number;
         dispute_rate: number;
+        churn_rate: number;
     };
     alerts: Alert[];
     recent_activities: Activity[];
@@ -228,6 +229,21 @@ async function fetchHealthMetrics(startDate: string) {
     const withDisputes = projects?.filter(p => p.has_dispute).length || 0;
     const disputeRate = totalProjects > 0 ? withDisputes / totalProjects : 0;
 
+    // Churn Rate
+    const { count: cancelledSubs } = await supabase
+        .from('editor_subscriptions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'cancelled')
+        .gte('updated_at', startDate);
+
+    const { count: activeSubs } = await supabase
+        .from('editor_subscriptions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
+
+    const totalSubs = (activeSubs || 0) + (cancelledSubs || 0);
+    const churnRate = totalSubs > 0 ? (cancelledSubs || 0) / totalSubs : 0;
+
     return {
         project_completion_rate: projectCompletionRate,
         avg_time_to_assign: avgTimeToAssign || 0,
@@ -235,6 +251,7 @@ async function fetchHealthMetrics(startDate: string) {
         avg_creator_rating: avgCreatorRating,
         avg_editor_rating: avgEditorRating,
         dispute_rate: disputeRate,
+        churn_rate: churnRate,
     };
 }
 

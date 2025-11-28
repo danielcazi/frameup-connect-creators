@@ -6,8 +6,10 @@ import {
     FileText,
     DollarSign,
     TrendingUp,
+    TrendingDown,
     AlertCircle,
     Activity,
+    Tag,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -79,27 +81,27 @@ export default function AdminDashboard() {
                         <div
                             key={index}
                             className={`p-4 rounded-lg border flex items-start justify-between ${alert.severity === 'error'
-                                    ? 'bg-red-50 border-red-200'
-                                    : alert.severity === 'warning'
-                                        ? 'bg-yellow-50 border-yellow-200'
-                                        : 'bg-blue-50 border-blue-200'
+                                ? 'bg-red-50 border-red-200'
+                                : alert.severity === 'warning'
+                                    ? 'bg-yellow-50 border-yellow-200'
+                                    : 'bg-blue-50 border-blue-200'
                                 }`}
                         >
                             <div className="flex items-start space-x-3">
                                 <AlertCircle
                                     className={`w-5 h-5 mt-0.5 ${alert.severity === 'error'
-                                            ? 'text-red-600'
-                                            : alert.severity === 'warning'
-                                                ? 'text-yellow-600'
-                                                : 'text-blue-600'
+                                        ? 'text-red-600'
+                                        : alert.severity === 'warning'
+                                            ? 'text-yellow-600'
+                                            : 'text-blue-600'
                                         }`}
                                 />
                                 <p
                                     className={`text-sm font-medium ${alert.severity === 'error'
-                                            ? 'text-red-900'
-                                            : alert.severity === 'warning'
-                                                ? 'text-yellow-900'
-                                                : 'text-blue-900'
+                                        ? 'text-red-900'
+                                        : alert.severity === 'warning'
+                                            ? 'text-yellow-900'
+                                            : 'text-blue-900'
                                         }`}
                                 >
                                     {alert.message}
@@ -108,10 +110,10 @@ export default function AdminDashboard() {
                             <button
                                 onClick={() => navigate(alert.action_url)}
                                 className={`text-sm font-medium ${alert.severity === 'error'
-                                        ? 'text-red-600 hover:text-red-700'
-                                        : alert.severity === 'warning'
-                                            ? 'text-yellow-600 hover:text-yellow-700'
-                                            : 'text-blue-600 hover:text-blue-700'
+                                    ? 'text-red-600 hover:text-red-700'
+                                    : alert.severity === 'warning'
+                                        ? 'text-yellow-600 hover:text-yellow-700'
+                                        : 'text-blue-600 hover:text-blue-700'
                                     }`}
                             >
                                 Ver →
@@ -120,6 +122,54 @@ export default function AdminDashboard() {
                     ))}
                 </div>
             )}
+
+            {/* Acesso Rápido */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <button
+                    onClick={() => navigate('/admin/discounts')}
+                    className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors flex flex-col items-center justify-center gap-2 text-center"
+                >
+                    <div className="p-2 bg-purple-100 rounded-full text-purple-600">
+                        <Tag className="w-6 h-6" />
+                    </div>
+                    <span className="font-medium text-gray-900">Criar Desconto</span>
+                </button>
+
+                <button
+                    onClick={() => navigate('/admin/analytics')}
+                    className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors flex flex-col items-center justify-center gap-2 text-center"
+                >
+                    <div className="p-2 bg-red-100 rounded-full text-red-600">
+                        <TrendingDown className="w-6 h-6" />
+                    </div>
+                    <div className="flex flex-col items-center">
+                        <span className="text-xs text-gray-500">Churn Rate</span>
+                        <span className="font-bold text-xl text-gray-900">
+                            {(dashboard.health_metrics.churn_rate * 100).toFixed(1)}%
+                        </span>
+                    </div>
+                </button>
+
+                <button
+                    onClick={() => navigate('/admin/analytics')}
+                    className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors flex flex-col items-center justify-center gap-2 text-center"
+                >
+                    <div className="p-2 bg-orange-100 rounded-full text-orange-600">
+                        <FileText className="w-6 h-6" />
+                    </div>
+                    <span className="font-medium text-gray-900">Relatório de Cancelamento</span>
+                </button>
+
+                <button
+                    onClick={() => navigate('/admin/disputes')}
+                    className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:bg-gray-50 transition-colors flex flex-col items-center justify-center gap-2 text-center"
+                >
+                    <div className="p-2 bg-blue-100 rounded-full text-blue-600">
+                        <AlertCircle className="w-6 h-6" />
+                    </div>
+                    <span className="font-medium text-gray-900">Disputas</span>
+                </button>
+            </div>
 
             {/* Overview Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -245,8 +295,8 @@ export default function AdminDashboard() {
                             <div className="w-full bg-gray-200 rounded-full h-2">
                                 <div
                                     className={`h-2 rounded-full transition-all duration-500 ${dashboard.health_metrics.dispute_rate > 0.05
-                                            ? 'bg-red-600'
-                                            : 'bg-green-600'
+                                        ? 'bg-red-600'
+                                        : 'bg-green-600'
                                         }`}
                                     style={{ width: `${Math.min(dashboard.health_metrics.dispute_rate * 100 * 5, 100)}%` }} // Amplified for visibility
                                 />

@@ -96,20 +96,7 @@ export interface SubscriptionMetrics {
     avgLifetime: number;
 }
 
-export interface DiscountCode {
-    id: string;
-    code: string;
-    discount_type: 'percentage' | 'fixed';
-    discount_value: number;
-    max_uses?: number;
-    current_uses: number;
-    valid_from: string;
-    valid_until?: string;
-    is_active: boolean;
-    applies_to: 'subscription' | 'project' | 'all';
-    min_amount?: number;
-    created_at: string;
-}
+import { DiscountCode } from '@/types/admin';
 
 // Em adminFinancial.ts, adicione no início
 export class FinancialError extends Error {
@@ -186,12 +173,12 @@ export async function getFinancialDashboard(
         // Buscar assinaturas
         const { data: subscriptions } = await supabase
             .from('editor_subscriptions')
-            .select('status, plan_id, created_at, updated_at, subscription_plans(price)')
+            .select('status, plan_id, created_at, updated_at, subscription_plans(price_monthly)')
             .eq('status', 'active');
 
         const activeSubscriptions = subscriptions?.length || 0;
         const subscriptionMRR = subscriptions?.reduce((sum, s: any) =>
-            sum + (s.subscription_plans?.price || 0), 0) || 0;
+            sum + (s.subscription_plans?.price_monthly || 0), 0) || 0;
 
         // Novas assinaturas no período
         const { count: newSubs } = await supabase
@@ -403,7 +390,7 @@ export async function getSubscriptionMetrics(): Promise<SubscriptionMetrics[]> {
         subscription_plans (
           id,
           name,
-          price
+          price_monthly
         )
       `);
 
@@ -420,7 +407,7 @@ export async function getSubscriptionMetrics(): Promise<SubscriptionMetrics[]> {
 
         (subscriptions || []).forEach((sub: any) => {
             const planName = sub.subscription_plans?.name || 'Desconhecido';
-            const price = sub.subscription_plans?.price || 0;
+            const price = sub.subscription_plans?.price_monthly || 0;
 
             if (!grouped.has(planName)) {
                 grouped.set(planName, {

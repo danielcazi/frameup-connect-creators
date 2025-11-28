@@ -1,5 +1,5 @@
 // Enums
-export type AdminRole = 'super_admin' | 'admin' | 'financial' | 'support';
+export type AdminRole = 'super_admin' | 'admin' | 'financial' | 'support' | 'gestor';
 
 export type Permission =
     // Gestão de usuários
@@ -36,6 +36,7 @@ export type Permission =
 export interface AdminUser {
     id: string;
     user_id: string;
+    full_name?: string; // Joined from users table
     role: AdminRole;
     permissions: Permission[];
     is_active: boolean;
@@ -80,6 +81,7 @@ export const ROLE_HIERARCHY: Record<AdminRole, number> = {
     'admin': 3,
     'financial': 2,
     'support': 2,
+    'gestor': 3,
 };
 
 // Permissions por Role (padrão)
@@ -109,6 +111,11 @@ export const DEFAULT_PERMISSIONS: Record<AdminRole, Permission[]> = {
         'view_users', 'approve_editors', 'reject_editors',
         'view_disputes', 'resolve_disputes',
         'view_all_messages', 'send_platform_messages', 'moderate_messages'
+    ],
+    'gestor': [
+        'view_users', 'ban_users', 'unban_users', 'approve_editors', 'reject_editors',
+        'view_all_projects', 'modify_project_prices', 'apply_discounts',
+        'view_analytics', 'export_data'
     ]
 };
 

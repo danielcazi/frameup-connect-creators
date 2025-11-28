@@ -49,15 +49,29 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
     const loadAdminData = async (userId: string) => {
         try {
-            const { data, error } = await supabase
+            // 1. Fetch admin data
+            const { data: adminData, error: adminError } = await supabase
                 .from('admin_users')
                 .select('*')
                 .eq('user_id', userId)
                 .eq('is_active', true)
                 .single();
 
-            if (error) throw error;
-            setAdmin(data);
+            if (adminError) throw adminError;
+
+            // 2. Fetch user profile data separately to avoid join issues
+            const { data: userData, error: userError } = await supabase
+                .from('users') // Assuming public.users
+                .select('full_name')
+                .eq('id', userId)
+                .single();
+
+            // Note: If userError occurs (e.g. no profile), we just use adminData
+
+            setAdmin({
+                ...adminData,
+                full_name: userData?.full_name || adminData.role // Fallback
+            });
         } catch (error) {
             console.error('Erro ao carregar dados do admin:', error);
             setAdmin(null);

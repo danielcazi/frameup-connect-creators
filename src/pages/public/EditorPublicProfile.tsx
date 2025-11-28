@@ -19,6 +19,7 @@ import {
     Edit,
     MessageSquare,
 } from 'lucide-react';
+import FavoriteButton from '@/components/favorites/FavoriteButton';
 
 interface EditorProfile {
     user_id: string;
@@ -234,12 +235,20 @@ function EditorPublicProfile() {
                                         Editar Perfil
                                     </Button>
                                 ) : userType === 'creator' && (
-                                    <Button
-                                        onClick={() => navigate('/creator/dashboard')}
-                                    >
-                                        <MessageSquare className="w-4 h-4 mr-2" />
-                                        Ver Projetos
-                                    </Button>
+                                    <div className="flex items-center gap-3">
+                                        <Button
+                                            onClick={() => navigate('/creator/dashboard')}
+                                        >
+                                            <MessageSquare className="w-4 h-4 mr-2" />
+                                            Ver Projetos
+                                        </Button>
+                                        <FavoriteButton
+                                            editorId={profile.user_id}
+                                            editorName={profile.users.full_name}
+                                            size="lg"
+                                            showLabel
+                                        />
+                                    </div>
                                 )}
                             </div>
                         </div>

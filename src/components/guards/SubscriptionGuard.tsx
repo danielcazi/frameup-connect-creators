@@ -46,7 +46,7 @@ function SubscriptionGuard({
 
         try {
             const { data, error: subError } = await supabase
-                .from('user_subscriptions')
+                .from('editor_subscriptions')
                 .select(`
           *,
           subscription_plans (
@@ -55,10 +55,10 @@ function SubscriptionGuard({
             max_simultaneous_projects
           )
         `)
-                .eq('user_id', user.id)
+                .eq('editor_id', user.id)
                 .order('created_at', { ascending: false })
                 .limit(1)
-                .single();
+                .maybeSingle();
 
             if (subError && subError.code !== 'PGRST116') {
                 throw subError;
@@ -75,7 +75,11 @@ function SubscriptionGuard({
             }
         } catch (err: any) {
             console.error('Error checking subscription:', err);
-            setError('Erro ao verificar assinatura');
+            // Se não requer assinatura ativa, não bloqueamos o acesso por erro na verificação
+            // Apenas assumimos que não há assinatura (subscription = null)
+            if (requireActive) {
+                setError('Erro ao verificar assinatura');
+            }
         } finally {
             setLoading(false);
         }
@@ -98,8 +102,8 @@ function SubscriptionGuard({
         return <Navigate to="/auth/login" state={{ from: location }} replace />;
     }
 
-    // Sem assinatura - redirecionar para planos
-    if (!subscription) {
+    // Sem assinatura - redirecionar para planos APENAS se requireActive for true
+    if (!subscription && requireActive) {
         return <Navigate to="/editor/subscription/plans" replace />;
     }
 
@@ -162,7 +166,7 @@ function SubscriptionGuard({
     }
 
     // Assinatura cancelada (mas ainda no período)
-    if (subscription.status === 'cancelled' && subscription.cancel_at_period_end) {
+    if (subscription && subscription.status === 'cancelled' && subscription.cancel_at_period_end) {
         const endDate = new Date(subscription.current_period_end);
         const now = new Date();
 

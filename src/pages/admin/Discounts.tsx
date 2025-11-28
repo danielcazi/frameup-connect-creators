@@ -24,7 +24,7 @@ export default function Discounts() {
     });
 
     useEffect(() => {
-        if (hasPermission('modify_pricing_table')) {
+        if (hasPermission('modify_pricing_table') || hasPermission('apply_discounts')) {
             loadDiscounts();
         }
     }, []);
@@ -91,7 +91,7 @@ export default function Discounts() {
         }
     };
 
-    if (!hasPermission('modify_pricing_table')) {
+    if (!hasPermission('modify_pricing_table') && !hasPermission('apply_discounts')) {
         return (
             <div className="p-8 text-center text-gray-500">
                 Você não tem permissão para gerenciar cupons.

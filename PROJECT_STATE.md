@@ -9,10 +9,10 @@
 
 ---
 
-## 📊 STATUS GERAL: 85% Completo
+## 📊 STATUS GERAL: 90% Completo
 
 ```
-█████████████████░░░ 85%
+██████████████████░░ 90%
 ```
 
 ---
@@ -324,6 +324,20 @@ src/
 
 #### Status Atualizado
 - Gestão de Admins: ❌ Básico → ✅ Completo
+
+### [2025-11-28] - Fase 24: Sistema de Favoritos
+#### Adicionado
+- Tabela `creator_favorites` no Supabase
+- Service `favoritesService.ts`
+- Hook `useFavorites.ts` e `useFavoriteCheck`
+- Componente `FavoriteButton.tsx`
+- Página `Favorites.tsx` para creators
+- Botão de favoritar nos cards de editor
+- Nota pessoal em cada favorito
+- Notificação para editor quando favoritado
+
+#### Status Atualizado
+- Sistema de Favoritos: ❌ Não existe → ✅ Completo
 
 ### [2025-11-28] - Fase 22: Badge de Mensagens no Header
 #### Adicionado

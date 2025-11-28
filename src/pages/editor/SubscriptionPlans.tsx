@@ -12,7 +12,7 @@ interface Plan {
     id: string;
     name: string;
     display_name: string;
-    price: number;
+    price_monthly: number;
     max_simultaneous_projects: number;
     has_highlight_badge: boolean;
     features: string[];
@@ -39,8 +39,7 @@ function SubscriptionPlans() {
             const { data, error } = await supabase
                 .from('subscription_plans')
                 .select('*')
-                .eq('is_active', true)
-                .order('price', { ascending: true });
+                .order('price_monthly', { ascending: true });
 
             if (error) throw error;
 
@@ -61,9 +60,9 @@ function SubscriptionPlans() {
         if (!user) return;
         try {
             const { data } = await supabase
-                .from('user_subscriptions')
+                .from('editor_subscriptions')
                 .select('*, subscription_plans(*)')
-                .eq('user_id', user.id)
+                .eq('editor_id', user.id)
                 .eq('status', 'active')
                 .single();
 
@@ -127,6 +126,23 @@ function SubscriptionPlans() {
         );
     }
 
+    const DEFAULT_FEATURES = {
+        basic: [
+            'Acesso a projetos ilimitados',
+            '2 projetos simultâneos',
+            'Taxa de plataforma reduzida (15%)',
+            'Suporte por email'
+        ],
+        pro: [
+            'Acesso a projetos ilimitados',
+            '4 projetos simultâneos',
+            'Taxa de plataforma mínima (10%)',
+            'Suporte prioritário',
+            'Badge de Editor PRO',
+            'Acesso antecipado a novos projetos'
+        ]
+    };
+
     return (
         <DashboardLayout
             userType="editor"
@@ -146,81 +162,85 @@ function SubscriptionPlans() {
 
                 {/* Plans Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-                    {plans.map((plan) => (
-                        <Card
-                            key={plan.id}
-                            className={`relative p-8 flex flex-col ${plan.name === 'pro'
+                    {plans.map((plan) => {
+                        const features = plan.features || DEFAULT_FEATURES[plan.name as keyof typeof DEFAULT_FEATURES] || [];
+
+                        return (
+                            <Card
+                                key={plan.id}
+                                className={`relative p-8 flex flex-col ${plan.name === 'pro'
                                     ? 'border-2 border-primary shadow-xl'
                                     : 'border border-border shadow-sm'
-                                }`}
-                        >
-                            {/* Badge PRO */}
-                            {plan.has_highlight_badge && (
-                                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                                    <div className="bg-gradient-to-r from-primary to-blue-600 text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold flex items-center gap-1 shadow-lg">
-                                        <Crown className="w-4 h-4" />
-                                        Mais Popular
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="text-center mb-6">
-                                {/* Icon */}
-                                <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4">
-                                    {plan.name === 'basic' ? (
-                                        <Zap className="w-8 h-8 text-primary" />
-                                    ) : (
-                                        <Crown className="w-8 h-8 text-primary" />
-                                    )}
-                                </div>
-
-                                {/* Nome */}
-                                <h3 className="text-2xl font-bold text-foreground mb-2">
-                                    {plan.display_name}
-                                </h3>
-
-                                {/* Preço */}
-                                <div className="flex items-baseline justify-center gap-1 mb-1">
-                                    <span className="text-4xl font-bold text-foreground">
-                                        R$ {Number(plan.price).toFixed(2).replace('.', ',')}
-                                    </span>
-                                    <span className="text-muted-foreground">/mês</span>
-                                </div>
-
-                                <p className="text-sm text-muted-foreground">
-                                    Até {plan.max_simultaneous_projects} projetos simultâneos
-                                </p>
-                            </div>
-
-                            {/* Features */}
-                            <ul className="space-y-3 mb-8 flex-1">
-                                {plan.features.map((feature, index) => (
-                                    <li key={index} className="flex items-start gap-3">
-                                        <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                                        <span className="text-foreground/80">{feature}</span>
-                                    </li>
-                                ))}
-                            </ul>
-
-                            {/* CTA Button */}
-                            <Button
-                                variant={plan.name === 'pro' ? 'default' : 'outline'}
-                                size="lg"
-                                className="w-full"
-                                onClick={() => handleSubscribe(plan.name)}
-                                disabled={subscribing}
+                                    }`}
                             >
-                                {subscribing && selectedPlan === plan.name ? (
-                                    <>
-                                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                                        Processando...
-                                    </>
-                                ) : (
-                                    `Assinar ${plan.display_name}`
+                                {/* Badge PRO */}
+                                {plan.has_highlight_badge && (
+                                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                                        <div className="bg-gradient-to-r from-primary to-blue-600 text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold flex items-center gap-1 shadow-lg">
+                                            <Crown className="w-4 h-4" />
+                                            Mais Popular
+                                        </div>
+                                    </div>
                                 )}
-                            </Button>
-                        </Card>
-                    ))}
+
+                                <div className="text-center mb-6">
+                                    {/* Icon */}
+                                    <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4">
+                                        {plan.name === 'basic' ? (
+                                            <Zap className="w-8 h-8 text-primary" />
+                                        ) : (
+                                            <Crown className="w-8 h-8 text-primary" />
+                                        )}
+                                    </div>
+
+                                    {/* Nome */}
+                                    <h3 className="text-2xl font-bold text-foreground mb-2">
+                                        {plan.display_name}
+                                    </h3>
+
+                                    {/* Preço */}
+                                    <div className="flex items-baseline justify-center gap-1 mb-1">
+                                        <span className="text-4xl font-bold text-foreground">
+                                            R$ {Number(plan.price_monthly).toFixed(2).replace('.', ',')}
+                                        </span>
+                                        <span className="text-muted-foreground">/mês</span>
+                                    </div>
+
+                                    <p className="text-sm text-muted-foreground">
+                                        Até {plan.max_simultaneous_projects} projetos simultâneos
+                                    </p>
+                                </div>
+
+                                {/* Features */}
+                                <ul className="space-y-3 mb-8 flex-1">
+                                    {features.map((feature, index) => (
+                                        <li key={index} className="flex items-start gap-3">
+                                            <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                                            <span className="text-foreground/80">{feature}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+
+                                {/* CTA Button */}
+                                <Button
+                                    variant={plan.name === 'pro' ? 'default' : 'outline'}
+                                    size="lg"
+                                    className="w-full"
+                                    onClick={() => handleSubscribe(plan.name)}
+                                    disabled={subscribing}
+                                >
+                                    {subscribing && selectedPlan === plan.name ? (
+                                        <>
+                                            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                                            Processando...
+                                        </>
+                                    ) : (
+                                        `Assinar ${plan.display_name}`
+                                    )}
+                                </Button>
+                            </Card>
+                        );
+                    })}
                 </div>
 
                 {/* FAQ / Info */}

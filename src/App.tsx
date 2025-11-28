@@ -17,6 +17,7 @@ import ReviewVideo from "./pages/creator/ReviewVideo";
 import Payment from "./pages/creator/Payment";
 import PaymentSuccess from "./pages/creator/PaymentSuccess";
 import EditorDashboard from "./pages/editor/Dashboard";
+import EditorProjects from "./pages/editor/Projects";
 import SubscriptionPlans from "./pages/editor/SubscriptionPlans";
 import SubscriptionSuccess from "./pages/editor/SubscriptionSuccess";
 import ManageSubscription from "./pages/editor/ManageSubscription";
@@ -42,8 +43,13 @@ import Financial from "./pages/admin/Financial";
 import Discounts from "./pages/admin/Discounts";
 import SuspiciousUsers from "./pages/admin/SuspiciousUsers";
 import AdminUsers from "./pages/admin/AdminUsers";
+import AdminProjects from "./pages/admin/AdminProjects";
 import Analytics from "./pages/admin/Analytics";
 import Notifications from "./pages/shared/Notifications";
+import Favorites from "./pages/creator/Favorites";
+import CreatorProjects from "./pages/creator/Projects";
+import CreatorEditors from "./pages/creator/Editors";
+import CreatorProfile from "./pages/creator/Profile";
 
 const queryClient = new QueryClient();
 
@@ -143,15 +149,55 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/creator/favorites"
+                element={
+                  <ProtectedRoute requiredUserType="creator">
+                    <Favorites />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/creator/projects"
+                element={
+                  <ProtectedRoute requiredUserType="creator">
+                    <CreatorProjects />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/creator/editors"
+                element={
+                  <ProtectedRoute requiredUserType="creator">
+                    <CreatorEditors />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/creator/profile"
+                element={
+                  <ProtectedRoute requiredUserType="creator">
+                    <CreatorProfile />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Editor Protected Routes */}
               <Route
                 path="/editor/dashboard"
                 element={
                   <ProtectedRoute requiredUserType="editor">
-                    <SubscriptionGuard requireActive={true}>
+                    <SubscriptionGuard requireActive={false}>
                       <EditorDashboard />
                     </SubscriptionGuard>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/editor/projects"
+                element={
+                  <ProtectedRoute requiredUserType="editor">
+                    <EditorProjects />
                   </ProtectedRoute>
                 }
               />
@@ -280,6 +326,7 @@ const App = () => (
                 <Route path="discounts" element={<Discounts />} />
                 <Route path="suspicious-users" element={<SuspiciousUsers />} />
                 <Route path="users" element={<AdminUsers />} />
+                <Route path="projects" element={<AdminProjects />} />
                 <Route path="analytics" element={<Analytics />} />
               </Route>
 

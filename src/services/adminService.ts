@@ -330,4 +330,33 @@ export const adminService = {
             return [];
         }
     },
+    /**
+     * Buscar todos os projetos
+     */
+    async getAllProjects() {
+        try {
+            const { data, error } = await supabase
+                .from('projects')
+                .select(`
+                    *,
+                    creator:creator_id (
+                        id,
+                        full_name,
+                        email
+                    ),
+                    editor:assigned_editor_id (
+                        id,
+                        full_name,
+                        email
+                    )
+                `)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Erro ao buscar projetos:', error);
+            return [];
+        }
+    },
 };

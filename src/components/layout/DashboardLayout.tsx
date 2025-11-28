@@ -10,7 +10,8 @@ import {
   User,
   CreditCard,
   Menu,
-  X
+  X,
+  Star
 } from 'lucide-react';
 import Badge from '@/components/common/Badge';
 import SubscriptionBanner from '@/components/editor/SubscriptionBanner';
@@ -47,14 +48,15 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       { label: 'Dashboard', path: '/creator/dashboard', icon: Home },
       { label: 'Meus Projetos', path: '/creator/projects', icon: FolderOpen },
       { label: 'Editores', path: '/creator/editors', icon: Users },
+      { label: 'Favoritos', path: '/creator/favorites', icon: Star },
       { label: 'Mensagens', path: '/creator/messages', icon: MessageSquare, badge: 0 },
     ]
     : [
       { label: 'Dashboard', path: '/editor/dashboard', icon: Home },
       { label: 'Meus Projetos', path: '/editor/projects', icon: FolderOpen },
+      { label: 'Mensagens', path: '/editor/messages', icon: MessageSquare, badge: 0 },
       { label: 'Perfil', path: '/editor/profile', icon: User },
       { label: 'Assinatura', path: '/editor/subscription/manage', icon: CreditCard },
-      { label: 'Mensagens', path: '/editor/messages', icon: MessageSquare, badge: 0 },
     ];
 
   const SidebarContent = () => (
@@ -93,7 +95,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         <div className="flex items-center justify-between h-full px-4 lg:px-6">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <RouterNavLink to="/" className="flex items-center gap-2">
+            <RouterNavLink to={userType === 'creator' ? '/creator/dashboard' : '/editor/dashboard'} className="flex items-center gap-2">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <span className="text-primary-foreground font-bold text-sm">FU</span>
               </div>
