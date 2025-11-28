@@ -43,6 +43,7 @@ import Discounts from "./pages/admin/Discounts";
 import SuspiciousUsers from "./pages/admin/SuspiciousUsers";
 import AdminUsers from "./pages/admin/AdminUsers";
 import Analytics from "./pages/admin/Analytics";
+import Notifications from "./pages/shared/Notifications";
 
 const queryClient = new QueryClient();
 
@@ -131,6 +132,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredUserType="creator">
                     <Messages />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/creator/notifications"
+                element={
+                  <ProtectedRoute requiredUserType="creator">
+                    <Notifications />
                   </ProtectedRoute>
                 }
               />
@@ -247,6 +256,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredUserType="editor">
                     <EditorPricing />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/editor/notifications"
+                element={
+                  <ProtectedRoute requiredUserType="editor">
+                    <Notifications />
                   </ProtectedRoute>
                 }
               />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Video, Eye, EyeOff, Loader2 } from 'lucide-react';
@@ -38,6 +38,7 @@ const Login = () => {
     handleSubmit,
     formState: { errors, isValid },
     watch,
+    control,
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     mode: 'onChange',
@@ -56,6 +57,7 @@ const Login = () => {
   }, [user, navigate]);
 
   const onSubmit = async (data: LoginFormData) => {
+    console.log('Form submitted', data);
     setIsLoading(true);
 
     try {
@@ -64,7 +66,7 @@ const Login = () => {
       if (error) {
         // Handle specific error messages
         let errorMessage = 'Erro ao fazer login. Tente novamente';
-        
+
         if (error.message.includes('Supabase não configurado')) {
           errorMessage = 'Backend não configurado. Por favor, conecte o Lovable Cloud para habilitar autenticação.';
         } else if (error.message.includes('Invalid login credentials')) {
@@ -98,6 +100,7 @@ const Login = () => {
         navigate('/');
       }
     } catch (error) {
+      console.error('Login error:', error);
       toast({
         variant: 'destructive',
         title: 'Erro inesperado',
@@ -140,13 +143,12 @@ const Login = () => {
                 type="email"
                 placeholder="seu@email.com"
                 autoComplete="email"
-                className={`transition-all duration-200 ${
-                  email && !errors.email
-                    ? 'border-success focus-visible:ring-success'
-                    : errors.email
+                className={`transition-all duration-200 ${email && !errors.email
+                  ? 'border-success focus-visible:ring-success'
+                  : errors.email
                     ? 'border-error focus-visible:ring-error'
                     : ''
-                }`}
+                  }`}
                 {...register('email')}
               />
               {errors.email && (
@@ -163,13 +165,12 @@ const Login = () => {
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  className={`pr-10 transition-all duration-200 ${
-                    password && !errors.password
-                      ? 'border-success focus-visible:ring-success'
-                      : errors.password
+                  className={`pr-10 transition-all duration-200 ${password && !errors.password
+                    ? 'border-success focus-visible:ring-success'
+                    : errors.password
                       ? 'border-error focus-visible:ring-error'
                       : ''
-                  }`}
+                    }`}
                   {...register('password')}
                 />
                 <button
@@ -191,9 +192,19 @@ const Login = () => {
             </div>
 
             {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between relative z-20">
               <div className="flex items-center space-x-2">
-                <Checkbox id="rememberMe" {...register('rememberMe')} />
+                <Controller
+                  name="rememberMe"
+                  control={control}
+                  render={({ field }) => (
+                    <Checkbox
+                      id="rememberMe"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  )}
+                />
                 <label
                   htmlFor="rememberMe"
                   className="text-sm text-muted-foreground cursor-pointer select-none"
@@ -201,19 +212,19 @@ const Login = () => {
                   Lembrar-me
                 </label>
               </div>
-              <Link
-                to="/recuperar-senha"
-                className="text-sm text-primary hover:underline"
+              <span
+                onClick={() => navigate('/recuperar-senha')}
+                className="text-sm text-primary hover:underline cursor-pointer"
               >
                 Esqueci minha senha
-              </Link>
+              </span>
             </div>
 
             {/* Submit Button */}
             <Button
               type="submit"
-              className="w-full bg-primary hover:bg-primary-hover"
-              disabled={!isValid || isLoading}
+              className="w-full bg-primary hover:bg-primary-hover relative z-10"
+              disabled={isLoading}
             >
               {isLoading ? (
                 <>

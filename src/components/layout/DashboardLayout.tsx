@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { NavLink as RouterNavLink } from 'react-router-dom';
 import { NavLink } from '@/components/NavLink';
 import { cn } from '@/lib/utils';
 import {
@@ -13,6 +14,8 @@ import {
 } from 'lucide-react';
 import Badge from '@/components/common/Badge';
 import SubscriptionBanner from '@/components/editor/SubscriptionBanner';
+import NotificationDropdown from '@/components/notifications/NotificationDropdown';
+import MessageBadge from '@/components/messages/MessageBadge';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -84,6 +87,43 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     <div className="min-h-screen bg-background">
       {/* Subscription Banner */}
       <SubscriptionBanner />
+
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 h-16 bg-background border-b border-border z-40">
+        <div className="flex items-center justify-between h-full px-4 lg:px-6">
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            <RouterNavLink to="/" className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <span className="text-primary-foreground font-bold text-sm">FU</span>
+              </div>
+              <span className="font-bold text-lg text-foreground hidden sm:block">FrameUp</span>
+            </RouterNavLink>
+          </div>
+
+          {/* Right side: Messages + Notifications + User */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            {/* Mensagens */}
+            <MessageBadge />
+
+            {/* Notificações */}
+            <NotificationDropdown />
+
+            {/* Separador visual (opcional) */}
+            <div className="hidden sm:block w-px h-6 bg-border mx-1" />
+
+            {/* User Menu */}
+            <RouterNavLink
+              to={userType === 'creator' ? '/creator/profile' : '/editor/profile'}
+              className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent transition-colors"
+            >
+              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 text-muted-foreground" />
+              </div>
+            </RouterNavLink>
+          </div>
+        </div>
+      </header>
 
       {/* Mobile Menu Button */}
       <button
