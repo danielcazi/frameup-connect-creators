@@ -50,6 +50,7 @@ import Favorites from "./pages/creator/Favorites";
 import CreatorProjects from "./pages/creator/Projects";
 import CreatorEditors from "./pages/creator/Editors";
 import CreatorProfile from "./pages/creator/Profile";
+import EditorProposals from "./pages/editor/Proposals";
 
 const queryClient = new QueryClient();
 
@@ -310,6 +311,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredUserType="editor">
                     <Notifications />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/editor/proposals"
+                element={
+                  <ProtectedRoute requiredUserType="editor">
+                    <EditorProposals />
                   </ProtectedRoute>
                 }
               />

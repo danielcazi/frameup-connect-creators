@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { ProgressSteps } from '@/components/creator/ProgressSteps';
 import { VideoTypeCard } from '@/components/creator/VideoTypeCard';
@@ -12,6 +12,10 @@ import { PricingSummaryCard } from '@/components/creator/PricingSummaryCard';
 import { Step2Details } from '@/components/creator/Step2Details';
 import { useAuth } from '@/contexts/AuthContext';
 import { saveProjectDraft } from '@/lib/projects';
+import { RefreshCw, User, Star, X } from 'lucide-react';
+import { useWorkedEditors } from '@/hooks/useRehire';
+import { createRehireProject, WorkedEditor, formatProjectsCount } from '@/services/rehireService';
+import EditorSelectorModal from '@/components/rehire/EditorSelectorModal';
 
 type VideoType = 'reels' | 'motion' | 'youtube';
 type EditingStyle = 'lofi' | 'dynamic' | 'pro' | 'motion';
@@ -40,6 +44,7 @@ interface ProjectData {
 
 export default function NewProject() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
   const [step, setStep] = useState(1);
@@ -59,6 +64,22 @@ export default function NewProject() {
     total_paid_by_creator: 0,
     estimated_delivery_days: 0
   });
+
+  // Rehire State
+  const { editors: workedEditors, hasWorkedWithEditors } = useWorkedEditors();
+  const [selectedEditor, setSelectedEditor] = useState<WorkedEditor | null>(null);
+  const [rehireMessage, setRehireMessage] = useState('');
+  const [showEditorSelector, setShowEditorSelector] = useState(false);
+
+  // Check for pre-selected editor from navigation
+  useEffect(() => {
+    if (location.state?.rehireEditorId && workedEditors.length > 0) {
+      const editor = workedEditors.find(e => e.editor_id === location.state.rehireEditorId);
+      if (editor) {
+        setSelectedEditor(editor);
+      }
+    }
+  }, [location.state, workedEditors]);
 
   const pricing = useProjectPricing(
     projectData.video_type,
@@ -132,22 +153,49 @@ export default function NewProject() {
     setSaving(true);
 
     try {
-      // 1. Salvar projeto como draft
-      const result = await saveProjectDraft(projectData as any, user.id);
+      if (selectedEditor) {
+        // Create Rehire Project
+        const projectId = await createRehireProject(user.id, {
+          editorId: selectedEditor.editor_id,
+          title: projectData.title,
+          description: projectData.description,
+          videoType: projectData.video_type!,
+          editingStyle: projectData.editing_style!,
+          durationCategory: projectData.duration_category!,
+          basePrice: pricing.base_price,
+          platformFee: pricing.platform_fee,
+          totalPrice: pricing.total_paid_by_creator,
+          deadlineDays: projectData.estimated_delivery_days,
+          referenceFilesUrl: projectData.reference_files_url,
+          contextDescription: projectData.context_description,
+          rehireMessage: rehireMessage || undefined,
+        });
 
-      if (!result.success) {
-        throw new Error(result.error);
+        toast({
+          title: 'Proposta enviada!',
+          description: `${selectedEditor.editor_name} receberá sua proposta de recontratação.`,
+        });
+
+        navigate(`/creator/project/${projectId}`);
+      } else {
+        // Normal Project Creation
+        // 1. Salvar projeto como draft
+        const result = await saveProjectDraft(projectData as any, user.id);
+
+        if (!result.success) {
+          throw new Error(result.error);
+        }
+
+        // 2. Redirecionar para página de pagamento
+        toast({
+          title: 'Projeto salvo!',
+          description: 'Redirecionando para revisão e pagamento...',
+        });
+
+        setTimeout(() => {
+          navigate(`/creator/project/${result.project.id}/payment`);
+        }, 1500);
       }
-
-      // 2. Redirecionar para página de pagamento
-      toast({
-        title: 'Projeto salvo!',
-        description: 'Redirecionando para revisão e pagamento...',
-      });
-
-      setTimeout(() => {
-        navigate(`/creator/project/${result.project.id}/payment`);
-      }, 1500);
 
     } catch (error: any) {
       toast({
@@ -172,6 +220,94 @@ export default function NewProject() {
         {step === 1 && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
             <div className="lg:col-span-2 space-y-8">
+
+              {/* Seção de Recontratação */}
+              {hasWorkedWithEditors && (
+                <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <RefreshCw className="w-5 h-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <h2 className="font-semibold text-gray-900">Recontratar Editor</h2>
+                        <p className="text-sm text-gray-500">
+                          Trabalhe novamente com alguém que você já conhece
+                        </p>
+                      </div>
+                    </div>
+
+                    {!selectedEditor && (
+                      <button
+                        onClick={() => setShowEditorSelector(true)}
+                        className="px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors text-sm font-medium"
+                      >
+                        Selecionar editor
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Editor Selecionado */}
+                  {selectedEditor && (
+                    <div className="p-4 bg-blue-50 rounded-xl">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          {selectedEditor.editor_photo ? (
+                            <img
+                              src={selectedEditor.editor_photo}
+                              alt={selectedEditor.editor_name}
+                              className="w-12 h-12 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                              <User className="w-6 h-6 text-blue-600" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-medium text-gray-900">{selectedEditor.editor_name}</p>
+                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                              {selectedEditor.editor_rating > 0 && (
+                                <span className="flex items-center gap-1">
+                                  <Star className="w-3.5 h-3.5 text-yellow-500 fill-current" />
+                                  {selectedEditor.editor_rating.toFixed(1)}
+                                </span>
+                              )}
+                              <span>•</span>
+                              <span>{formatProjectsCount(selectedEditor.projects_together)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => setSelectedEditor(null)}
+                          className="p-1.5 hover:bg-blue-100 rounded-lg transition-colors"
+                        >
+                          <X className="w-5 h-5 text-gray-500" />
+                        </button>
+                      </div>
+
+                      {/* Mensagem personalizada */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                          Mensagem para o editor (opcional)
+                        </label>
+                        <textarea
+                          value={rehireMessage}
+                          onChange={(e) => setRehireMessage(e.target.value)}
+                          placeholder="Ex: Gostei muito do último trabalho! Tenho um novo projeto similar..."
+                          rows={2}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm"
+                        />
+                      </div>
+
+                      <p className="mt-3 text-xs text-blue-700 bg-blue-100 rounded-lg px-3 py-2">
+                        💡 Ao criar o projeto, {selectedEditor.editor_name} receberá sua proposta e poderá aceitar ou recusar.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Tipo de Vídeo */}
               <section>
                 <h3 className="text-lg font-semibold mb-4 text-foreground">
@@ -332,6 +468,18 @@ export default function NewProject() {
             onChange={updateProjectData}
             onBack={() => setStep(1)}
             onSubmit={handleCreateProject}
+          />
+        )}
+
+        {/* Modal de Seleção de Editor */}
+        {showEditorSelector && (
+          <EditorSelectorModal
+            editors={workedEditors}
+            onSelect={(editor) => {
+              setSelectedEditor(editor);
+              setShowEditorSelector(false);
+            }}
+            onClose={() => setShowEditorSelector(false)}
           />
         )}
       </div>

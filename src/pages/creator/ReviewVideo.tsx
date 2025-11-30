@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import DeliveryHistory from '@/components/shared/DeliveryHistory';
+import { canRehireEditor } from '@/services/rehireService';
 import {
     CheckCircle,
     XCircle,
@@ -18,6 +19,8 @@ import {
     ExternalLink,
     Play,
     Star,
+    RefreshCw,
+    User,
 } from 'lucide-react';
 
 interface Project {
@@ -25,6 +28,12 @@ interface Project {
     title: string;
     status: string;
     price: number;
+    assigned_editor_id?: string;
+    editor?: {
+        full_name: string | null;
+        username: string | null;
+        profile_photo_url: string | null;
+    };
 }
 
 interface Delivery {
@@ -47,6 +56,7 @@ function ReviewVideo() {
     const [deliveries, setDeliveries] = useState<Delivery[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
+    const [checkingRehire, setCheckingRehire] = useState(false);
 
     const [showRevisionForm, setShowRevisionForm] = useState(false);
     const [feedback, setFeedback] = useState('');
@@ -85,14 +95,25 @@ function ReviewVideo() {
         try {
             const { data, error } = await supabase
                 .from('projects')
-                .select('id, title, status, price')
+                .select(`
+                    id, 
+                    title, 
+                    status, 
+                    price,
+                    assigned_editor_id,
+                    editor:users!assigned_editor_id (
+                        full_name,
+                        username,
+                        profile_photo_url
+                    )
+                `)
                 .eq('id', id)
                 .eq('creator_id', user?.id)
                 .single();
 
             if (error) throw error;
 
-            setProject(data);
+            setProject(data as any);
         } catch (error) {
             console.error('Error loading project:', error);
             toast({
@@ -139,9 +160,6 @@ function ReviewVideo() {
         setActionLoading(true);
 
         try {
-            // Nota: A função approve_video ainda não foi criada no banco, mas será no próximo passo.
-            // Por enquanto, vou deixar o código pronto para chamá-la.
-            // Se der erro, é porque a função não existe ainda.
             const { data, error } = await supabase.rpc('approve_video', {
                 p_delivery_id: latestDelivery.id,
                 p_project_id: id,
@@ -163,8 +181,6 @@ function ReviewVideo() {
                 });
             } catch (paymentError) {
                 console.error('Erro ao processar pagamento:', paymentError);
-                // Não falhar o fluxo principal, pois o vídeo já foi aprovado
-                // O pagamento ficará pendente e poderá ser processado depois
             }
 
             toast({
@@ -242,6 +258,41 @@ function ReviewVideo() {
             setActionLoading(false);
         }
     }
+
+    const handleRehire = async () => {
+        if (!user || !project?.assigned_editor_id) return;
+
+        setCheckingRehire(true);
+        try {
+            const { canRehire, reason } = await canRehireEditor(user.id, project.assigned_editor_id);
+
+            if (!canRehire) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Não é possível recontratar',
+                    description: reason || 'Tente novamente mais tarde.',
+                });
+                return;
+            }
+
+            // Navegar para criar projeto com editor pré-selecionado
+            navigate('/creator/new-project', {
+                state: {
+                    rehireEditorId: project.assigned_editor_id,
+                    rehireEditorName: project.editor?.full_name || project.editor?.username,
+                    rehireEditorPhoto: project.editor?.profile_photo_url,
+                },
+            });
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Erro',
+                description: error.message || 'Não foi possível verificar a recontratação.',
+            });
+        } finally {
+            setCheckingRehire(false);
+        }
+    };
 
     const latestDelivery = deliveries[0];
     const isPendingReview = latestDelivery?.status === 'pending_review';
@@ -468,36 +519,88 @@ function ReviewVideo() {
 
                 {/* Completed */}
                 {project?.status === 'completed' && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-6 flex items-start gap-4">
-                        <div className="bg-green-100 p-2 rounded-full">
-                            <CheckCircle className="w-6 h-6 text-green-600" />
+                    <>
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-6 flex items-start gap-4">
+                            <div className="bg-green-100 p-2 rounded-full">
+                                <CheckCircle className="w-6 h-6 text-green-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-green-900 mb-2">
+                                    Projeto Concluído! 🎉
+                                </h3>
+                                <p className="text-green-700 mb-4">
+                                    Você aprovou o vídeo final. O pagamento foi processado para o editor.
+                                </p>
+                                <Button
+                                    className="bg-green-600 hover:bg-green-700 text-white"
+                                    onClick={() => navigate(`/creator/project/${id}/rate`)}
+                                    disabled={hasReviewed}
+                                >
+                                    {hasReviewed ? (
+                                        <>
+                                            <CheckCircle className="w-4 h-4 mr-2" />
+                                            Você já avaliou este projeto
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Star className="w-4 h-4 mr-2" />
+                                            Avaliar Editor
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="text-lg font-semibold text-green-900 mb-2">
-                                Projeto Concluído! 🎉
-                            </h3>
-                            <p className="text-green-700 mb-4">
-                                Você aprovou o vídeo final. O pagamento foi processado para o editor.
-                            </p>
-                            <Button
-                                className="bg-green-600 hover:bg-green-700 text-white"
-                                onClick={() => navigate(`/creator/project/${id}/rate`)}
-                                disabled={hasReviewed}
-                            >
-                                {hasReviewed ? (
-                                    <>
-                                        <CheckCircle className="w-4 h-4 mr-2" />
-                                        Você já avaliou este projeto
-                                    </>
-                                ) : (
-                                    <>
-                                        <Star className="w-4 h-4 mr-2" />
-                                        Avaliar Editor
-                                    </>
-                                )}
-                            </Button>
-                        </div>
-                    </div>
+
+                        {project?.assigned_editor_id && (
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
+                                <div className="flex items-center gap-4">
+                                    {/* Avatar do Editor */}
+                                    <div className="flex-shrink-0">
+                                        {project.editor?.profile_photo_url ? (
+                                            <img
+                                                src={project.editor.profile_photo_url}
+                                                alt={project.editor.full_name || 'Editor'}
+                                                className="w-16 h-16 rounded-full object-cover border-2 border-white shadow"
+                                            />
+                                        ) : (
+                                            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center border-2 border-white shadow">
+                                                <User className="w-8 h-8 text-blue-600" />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Info */}
+                                    <div className="flex-1">
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                                            Gostou do trabalho?
+                                        </h3>
+                                        <p className="text-gray-600 text-sm">
+                                            Trabalhe novamente com{' '}
+                                            <span className="font-medium text-gray-900">
+                                                {project.editor?.full_name || project.editor?.username || 'este editor'}
+                                            </span>
+                                        </p>
+                                    </div>
+
+                                    {/* Botão */}
+                                    <button
+                                        onClick={handleRehire}
+                                        disabled={checkingRehire}
+                                        className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 font-medium"
+                                    >
+                                        {checkingRehire ? (
+                                            <RefreshCw className="w-5 h-5 animate-spin" />
+                                        ) : (
+                                            <>
+                                                <RefreshCw className="w-5 h-5" />
+                                                Recontratar
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
 
                 {/* Delivery History */}

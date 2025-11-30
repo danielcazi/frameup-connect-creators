@@ -68,45 +68,67 @@ function EditorPublicProfile() {
             // Remover @ do username se houver
             const cleanUsername = username?.replace('@', '');
 
-            // Buscar usuário pelo username
-            const { data: userData, error: userError } = await supabase
+            const { data, error } = await supabase
                 .from('users')
-                .select('id')
+                .select(`
+                    id,
+                    full_name,
+                    username,
+                    profile_photo_url,
+                    editor_profiles (
+                        bio,
+                        city,
+                        state,
+                        specialties,
+                        software_skills,
+                        rating_average,
+                        total_projects,
+                        total_reviews
+                    ),
+                    portfolio_videos (
+                        id,
+                        video_url,
+                        video_type,
+                        title,
+                        description,
+                        order_position
+                    )
+                `)
                 .eq('username', cleanUsername)
                 .single();
 
-            if (userError) throw userError;
-
-            // Buscar perfil completo
-            const { data, error } = await supabase
-                .from('editor_profiles')
-                .select(`
-          *,
-          users!editor_profiles_user_id_fkey (
-            full_name,
-            username,
-            profile_photo_url
-          ),
-          portfolio_videos (
-            id,
-            video_url,
-            video_type,
-            title,
-            description,
-            order_position
-          )
-        `)
-                .eq('user_id', userData.id)
-                .single();
-
             if (error) throw error;
+            if (!data) throw new Error('User not found');
+
+            // Handle editor_profiles being an array or object or null
+            const editorProfileData = Array.isArray(data.editor_profiles)
+                ? data.editor_profiles[0]
+                : data.editor_profiles;
+
+            const transformedProfile: EditorProfile = {
+                user_id: data.id,
+                bio: editorProfileData?.bio || '',
+                city: editorProfileData?.city || '',
+                state: editorProfileData?.state || '',
+                specialties: editorProfileData?.specialties || [],
+                software_skills: editorProfileData?.software_skills || [],
+                rating_average: editorProfileData?.rating_average || 0,
+                total_projects: editorProfileData?.total_projects || 0,
+                total_reviews: editorProfileData?.total_reviews || 0,
+                users: {
+                    full_name: data.full_name,
+                    username: data.username,
+                    profile_photo_url: data.profile_photo_url,
+                },
+                portfolio_videos: data.portfolio_videos || [],
+            };
 
             // Ordenar vídeos
-            if (data.portfolio_videos) {
-                data.portfolio_videos.sort((a: any, b: any) => a.order_position - b.order_position);
+            if (transformedProfile.portfolio_videos) {
+                transformedProfile.portfolio_videos.sort((a: any, b: any) => a.order_position - b.order_position);
             }
 
-            setProfile(data);
+            setProfile(transformedProfile);
         } catch (error) {
             console.error('Error loading profile:', error);
         } finally {

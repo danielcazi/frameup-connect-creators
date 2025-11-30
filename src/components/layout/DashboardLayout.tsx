@@ -11,7 +11,8 @@ import {
   CreditCard,
   Menu,
   X,
-  Star
+  Star,
+  RefreshCw
 } from 'lucide-react';
 import Badge from '@/components/common/Badge';
 import SubscriptionBanner from '@/components/editor/SubscriptionBanner';
@@ -53,6 +54,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     ]
     : [
       { label: 'Dashboard', path: '/editor/dashboard', icon: Home },
+      { label: 'Propostas', path: '/editor/proposals', icon: RefreshCw },
       { label: 'Meus Projetos', path: '/editor/projects', icon: FolderOpen },
       { label: 'Mensagens', path: '/editor/messages', icon: MessageSquare, badge: 0 },
       { label: 'Perfil', path: '/editor/profile', icon: User },

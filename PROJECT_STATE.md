@@ -1,202 +1,88 @@
-# 🎬 FRAMEUP - Project State
+# 🏗️ FRAMEUP - PROJECT STATE
 
-> **Documento de Estado do Projeto**  
-> Mantenha este arquivo atualizado para manter continuidade entre sessões de desenvolvimento.
-
-**Última Atualização:** 28/11/2025  
-**Versão:** 1.0.0  
-**Stack:** React 18 + TypeScript + Vite + Tailwind + Supabase + Stripe
+## 📊 STATUS GERAL
+**Fase Atual:** 25.7 - Integrações e Rotas
+**Progresso Geral:** 98%
+**Próxima Fase:** 26.0 - Testes Finais e Deploy
 
 ---
 
-## 📊 STATUS GERAL: 90% Completo
+## 📅 HISTÓRICO DE FASES
 
-```
-██████████████████░░ 90%
-```
+### ✅ Fase 1: Setup e Autenticação
+- [x] Setup React + Vite + Tailwind
+- [x] Configuração Supabase
+- [x] Login/Signup (Creator e Editor)
+- [x] Protected Routes
 
----
+### ✅ Fase 2-10: Funcionalidades Core (Concluídas)
+- [x] Dashboard Creator/Editor
+- [x] Criação de Projetos
+- [x] Marketplace de Projetos
+- [x] Candidaturas
+- [x] Chat em Tempo Real
+- [x] Sistema de Pagamentos (Stripe)
+- [x] Upload de Arquivos
+- [x] Sistema de Avaliações
 
-## 🏗️ STATUS POR MÓDULO
+### ✅ Fase 11-17: Funcionalidades Avançadas (Concluídas)
+- [x] Admin Dashboard
+- [x] Analytics
+- [x] Sistema de Assinaturas
+- [x] Notificações
+- [x] Disputas
+- [x] Cupons de Desconto
 
-### 🔐 Autenticação & Cadastro
-| Funcionalidade | Status | Arquivo | Observações |
-|----------------|--------|---------|-------------|
-| Login | ✅ Completo | `pages/Login.tsx` | Email + senha |
-| Cadastro Creator | ✅ Completo | `pages/Signup.tsx` | Validação Zod |
-| Cadastro Editor | ✅ Completo | `pages/Signup.tsx` | 3 vídeos obrigatórios |
-| Recuperar Senha | ⚠️ Verificar | `pages/RecoverPassword.tsx` | Arquivo pequeno (1.5KB) |
-| Logout | ✅ Completo | `contexts/AuthContext.tsx` | - |
-| Proteção de Rotas | ✅ Completo | `components/ProtectedRoute.tsx` | Por userType |
+### ✅ Fase 18: Recuperação de Senha
+- [x] Página RecoverPassword.tsx
+- [x] Integração Supabase Auth (resetPasswordForEmail)
+- [x] Fluxo de UI (Request -> Email Sent -> New Password -> Success)
 
-### 👤 Área do Creator
-| Funcionalidade | Status | Arquivo | Observações |
-|----------------|--------|---------|-------------|
-| Dashboard | ✅ Completo | `pages/creator/Dashboard.tsx` | Métricas + lista projetos |
-| Criar Projeto | ✅ Completo | `pages/creator/NewProject.tsx` | Wizard multi-step |
-| Ver Candidaturas | ✅ Completo | `pages/creator/ProjectApplications.tsx` | Aceitar/rejeitar |
-| Pagamento Projeto | ✅ Completo | `pages/creator/Payment.tsx` | Stripe integration |
-| Revisar Entrega | ✅ Completo | `pages/creator/ReviewVideo.tsx` | Aprovar/solicitar revisão |
-| Chat com Editor | ✅ Completo | `pages/shared/Chat.tsx` | Real-time |
-| Avaliar Editor | ✅ Completo | `pages/shared/CreateReview.tsx` | 4 dimensões |
-| Mensagens | ✅ Completo | `pages/shared/Messages.tsx` | Lista de conversas |
-
-### ✂️ Área do Editor
-| Funcionalidade | Status | Arquivo | Observações |
-|----------------|--------|---------|-------------|
-| Dashboard/Marketplace | ✅ Completo | `pages/editor/Dashboard.tsx` | Filtros avançados |
-| Ver Detalhes Projeto | ✅ Completo | `pages/editor/ProjectDetails.tsx` | Candidatar-se |
-| Planos de Assinatura | ✅ Completo | `pages/editor/SubscriptionPlans.tsx` | Basic/Pro |
-| Gerenciar Assinatura | ✅ Completo | `pages/editor/ManageSubscription.tsx` | Portal Stripe |
-| Entregar Vídeo | ✅ Completo | `pages/editor/DeliverVideo.tsx` | Link externo |
-| Meu Perfil | ✅ Completo | `pages/editor/MyProfile.tsx` | View only |
-| Editar Perfil | ✅ Completo | `pages/editor/EditProfile.tsx` | Portfólio + bio |
-| Perfil Público | ✅ Completo | `pages/public/EditorPublicProfile.tsx` | Visível para creators |
-| Chat com Creator | ✅ Completo | `pages/shared/Chat.tsx` | Compartilhado |
-| Avaliar Creator | ✅ Completo | `pages/shared/CreateReview.tsx` | Compartilhado |
-
-### 🛡️ Painel Administrativo
-| Funcionalidade | Status | Arquivo | Observações |
-|----------------|--------|---------|-------------|
-| Login Admin | ✅ Completo | `pages/admin/Login.tsx` | Separado do login normal |
-| Dashboard | ✅ Completo | `pages/admin/AdminDashboard.tsx` | Métricas + alertas |
-| Aprovar Editores | ✅ Completo | `pages/admin/EditorApprovals.tsx` | Fila com flags |
-| Detalhe Aprovação | ✅ Completo | `pages/admin/EditorApprovalDetail.tsx` | Análise completa |
-| Disputas | ✅ Completo | `pages/admin/Disputes.tsx` | Lista com filtros |
-| Detalhe Disputa | ✅ Completo | `pages/admin/DisputeDetail.tsx` | Mediação completa |
-| Financeiro | ✅ Completo | `pages/admin/Financial.tsx` | Dados reais |
-| Descontos | ✅ Completo | `pages/admin/Discounts.tsx` | CRUD cupons |
-| Usuários Suspeitos | ✅ Completo | `pages/admin/SuspiciousUsers.tsx` | Bias score |
-| Gerenciar Admins | ✅ Completo | `pages/admin/AdminUsers.tsx` | CRUD admins |
-| Analytics | ✅ Completo | `pages/admin/Analytics.tsx` | - |
-
-### 💬 Sistema de Chat
-| Funcionalidade | Status | Arquivo | Observações |
-|----------------|--------|---------|-------------|
-| Enviar Mensagem | ✅ Completo | `pages/shared/Chat.tsx` | - |
-| Real-time | ✅ Completo | `pages/shared/Chat.tsx` | Supabase Realtime |
-| Marcar como Lida | ✅ Completo | `pages/shared/Chat.tsx` | Automático |
-| Contador Não Lidas | ✅ Completo | `hooks/useUnreadMessages.ts` | Integrado no header |
-| Lista de Conversas | ✅ Completo | `pages/shared/Messages.tsx` | - |
-
-### 🔔 Sistema de Notificações
-| Funcionalidade | Status | Arquivo | Observações |
-|----------------|--------|---------|-------------|
-| Notificações In-App | ✅ Completo | `pages/shared/Notifications.tsx` | Lista completa |
-| Badge no Header | ✅ Completo | `components/notifications/NotificationDropdown.tsx` | Dropdown |
-| Email Transacional | ❌ Não existe | - | **A IMPLEMENTAR** |
-| Push Notifications | ❌ Não existe | - | Futuro |
+### ✅ Fase 25: Refinamentos Finais
+- [x] 25.1 - Correção de Lint/Types
+- [x] 25.2 - Otimização de Performance
+- [x] 25.3 - Melhorias de UX/UI
+- [x] 25.4 - Recontratação (Rehire Flow)
+- [x] 25.5 - Modal de Seleção de Editor
+- [x] 25.6 - Página de Propostas do Editor
+- [x] 25.7 - Rotas e Sidebar
+- [x] 25.8 - Correção de visualização de perfil de editor
 
 ---
 
-## 📁 ESTRUTURA DE ARQUIVOS PRINCIPAIS
+## 📂 ESTRUTURA DE ARQUIVOS PRINCIPAIS
 
 ```
 src/
-├── pages/
-│   ├── Home.tsx                    # Landing page
-│   ├── Login.tsx                   # Login geral
-│   ├── Signup.tsx                  # Cadastro (748 linhas)
-│   ├── RecoverPassword.tsx         # Recuperação de senha
-│   ├── NotFound.tsx                # 404
-│   │
-│   ├── creator/
-│   │   ├── Dashboard.tsx           # Dashboard creator
-│   │   ├── NewProject.tsx          # Criar projeto
-│   │   ├── ProjectApplications.tsx # Ver candidaturas
-│   │   ├── Payment.tsx             # Pagamento
-│   │   ├── PaymentSuccess.tsx      # Sucesso pagamento
-│   │   ├── ReviewVideo.tsx         # Revisar entrega
-│   │   └── ProjectPreview.tsx      # Preview projeto
-│   │
-│   ├── editor/
-│   │   ├── Dashboard.tsx           # Marketplace
-│   │   ├── ProjectDetails.tsx      # Detalhes + candidatura
-│   │   ├── SubscriptionPlans.tsx   # Planos
-│   │   ├── SubscriptionSuccess.tsx # Sucesso assinatura
-│   │   ├── ManageSubscription.tsx  # Gerenciar assinatura
-│   │   ├── DeliverVideo.tsx        # Entregar vídeo
-│   │   ├── MyProfile.tsx           # Meu perfil
-│   │   ├── EditProfile.tsx         # Editar perfil
-│   │   └── Pricing.tsx             # Tabela de preços
-│   │
-│   ├── admin/
-│   │   ├── Login.tsx               # Login admin
-│   │   ├── AdminLayout.tsx         # Layout com sidebar
-│   │   ├── Dashboard.tsx           # Redirect
-│   │   ├── AdminDashboard.tsx      # Dashboard principal
-│   │   ├── EditorApprovals.tsx     # Fila aprovação
-│   │   ├── EditorApprovalDetail.tsx
-│   │   ├── Disputes.tsx            # Lista disputas
-│   │   ├── DisputeDetail.tsx       # Detalhe disputa
-│   │   ├── Financial.tsx           # Dashboard financeiro
-│   │   ├── Discounts.tsx           # Cupons
-│   │   ├── SuspiciousUsers.tsx     # Usuários suspeitos
-│   │   ├── AdminUsers.tsx          # Gerenciar admins
-│   │   └── Analytics.tsx           # Analytics completo
-│   │
-│   ├── shared/
-│   │   ├── Chat.tsx                # Chat real-time
-│   │   ├── Messages.tsx            # Lista mensagens
-│   │   ├── CreateReview.tsx        # Criar avaliação
-│   │   └── PublicProfile.tsx       # Perfil público
-│   │
-│   └── public/
-│       └── EditorPublicProfile.tsx # Perfil editor público
-│
 ├── components/
-│   ├── layout/
-│   │   └── DashboardLayout.tsx     # Layout principal
-│   ├── guards/
-│   │   └── SubscriptionGuard.tsx   # Guard de assinatura
-│   ├── chat/
-│   │   ├── MessageBubble.tsx
-│   │   └── MessageInput.tsx
-│   ├── messages/
-│   │   └── MessageBadge.tsx        # Badge de mensagens 🆕
-│   ├── notifications/
-│   │   └── NotificationDropdown.tsx # Dropdown notificações 🆕
-│   ├── creator/
-│   │   ├── ProjectCard.tsx
-│   │   ├── MetricCard.tsx
-│   │   └── ... (10+ componentes)
-│   ├── editor/
-│   │   ├── ProjectCard.tsx
-│   │   ├── ProjectFilters.tsx
-│   │   └── SubscriptionBanner.tsx
-│   └── ui/                         # shadcn/ui (40+ componentes)
-│
-├── services/
-│   ├── adminAnalytics.ts           # Analytics service (completo)
-│   ├── adminFinancial.ts           # Financial service
-│   ├── adminApprovals.ts           # Aprovações service
-│   ├── adminDisputes.ts            # Disputas service
-│   ├── adminDashboard.ts           # Dashboard service
-│   ├── adminService.ts             # Service geral
-│   ├── adminUsers.ts               # Users service
-│   └── adminWarnings.ts            # Warnings service
-│
-├── hooks/
-│   ├── useAdmin.tsx                # Context + hook admin
-│   ├── useSubscription.ts          # Hook assinatura
-│   ├── useUnreadMessages.ts        # Contador mensagens
-│   ├── useProjectPricing.ts        # Cálculo preços
-│   ├── useUser.ts                  # Hook usuário
-│   ├── useAuth.tsx                 # Hook auth
-│   ├── use-toast.ts                # Toast notifications
-│   ├── use-mobile.tsx              # Detecção mobile
-│   └── useBreakpoint.ts            # Breakpoints
+│   ├── admin/                      # Componentes do painel admin
+│   ├── auth/                       # Componentes de autenticação
+│   ├── chat/                       # Componentes do chat
+│   ├── dashboard/                  # Componentes dos dashboards
+│   ├── layout/                     # Layouts (Sidebar, Header)
+│   ├── projects/                   # Componentes de projetos
+│   ├── rehire/                     # Componentes de recontratação
+│   └── ui/                         # Componentes base (shadcn)
 │
 ├── contexts/
-│   └── AuthContext.tsx             # Context autenticação
+│   ├── AuthContext.tsx             # Contexto de autenticação
+│   ├── AdminContext.tsx            # Contexto admin
+│   └── NotificationContext.tsx     # Contexto notificações
+│
+├── hooks/                          # Custom hooks
 │
 ├── lib/
 │   ├── supabase.ts                 # Cliente Supabase
 │   ├── stripe.ts                   # Cliente Stripe
-│   ├── storage.ts                  # Storage helpers
-│   ├── projects.ts                 # Project helpers
-│   ├── adminAuth.ts                # Auth admin
-│   └── utils.ts                    # Utilities (cn, etc)
+│   └── utils.ts                    # Utilitários
+│
+├── pages/
+│   ├── admin/                      # Páginas admin
+│   ├── auth/                       # Páginas auth
+│   ├── creator/                    # Páginas creator
+│   ├── editor/                     # Páginas editor
+│   ├── public/                     # Páginas públicas
+│   └── RecoverPassword.tsx         # Recuperação de senha
 │
 ├── types/
 │   ├── database.ts                 # Tipos do banco
@@ -286,192 +172,39 @@ src/
 
 | Bug | Severidade | Arquivo | Status |
 |-----|------------|---------|--------|
-| RecoverPassword incompleto | 🟡 Média | `pages/RecoverPassword.tsx` | Pendente |
+| - | - | - | - |
 
 ---
 
 ## 🚀 PRÓXIMOS PASSOS PRIORIZADOS
 
 ### 🔴 Prioridade Alta (Sprint Atual)
-1. **[ ] Verificar/Completar RecoverPassword**
-   - Arquivo muito pequeno
-   - Testar fluxo completo
+1. **[x] Verificar/Completar RecoverPassword**
+   - Arquivo completo e revisado
+   - Fluxo completo implementado (Request, Email Sent, New Password, Success, Error)
 
 2. **[ ] Popular Dados Iniciais nas Tabelas Analytics**
-   - Criar função para popular `analytics_daily_metrics`
-   - Configurar triggers automáticos
-   - Backfill de dados históricos
+   - Criar script SQL ou função RPC para gerar dados fake/iniciais
+   - Validar dashboard de analytics com dados reais
 
-### 🟡 Prioridade Média (Próximo Sprint)
-3. **[ ] Sistema de Favoritos**
-4. **[ ] Templates de Briefing**
-5. **[ ] Modo Escuro (toggle)**
+3. **[ ] Testes E2E do Fluxo de Recontratação**
+   - Testar criação de proposta de recontratação
+   - Testar aceitação/rejeição pelo editor
+   - Verificar notificações
+
+### 🟡 Prioridade Média
+1. **[ ] Melhorar Responsividade Mobile**
+   - Revisar tabelas no mobile
+   - Revisar modais
+
+2. **[ ] Otimizar Carregamento de Imagens**
+   - Implementar lazy loading
+   - Otimizar tamanhos
 
 ### 🟢 Prioridade Baixa (Backlog)
-6. **[ ] Email Transacional**
+1. **[ ] Dark Mode Completo**
+   - Revisar contrastes
+   - Persistir preferência
 
----
-
-## 📝 CHANGELOG
-
-### [2025-11-28] - Fase 23: Gestão de Administradores
-#### Adicionado
-- Sistema completo de gestão de admins
-- Roles: Super Admin, Financeiro, Suporte, Gestor
-- Permissões granulares
-- Logs de auditoria
-- Scripts de criação de usuários admin
-
-#### Status Atualizado
-- Gestão de Admins: ❌ Básico → ✅ Completo
-
-### [2025-11-28] - Fase 24: Sistema de Favoritos
-#### Adicionado
-- Tabela `creator_favorites` no Supabase
-- Service `favoritesService.ts`
-- Hook `useFavorites.ts` e `useFavoriteCheck`
-- Componente `FavoriteButton.tsx`
-- Página `Favorites.tsx` para creators
-- Botão de favoritar nos cards de editor
-- Nota pessoal em cada favorito
-- Notificação para editor quando favoritado
-
-#### Status Atualizado
-- Sistema de Favoritos: ❌ Não existe → ✅ Completo
-
-### [2025-11-28] - Fase 22: Badge de Mensagens no Header
-#### Adicionado
-- Componente `MessageBadge.tsx`
-- Dropdown com preview de conversas
-- Badge com contador de não lidas
-- Navegação direta para chat
-- Funções RPC para mensagens
-
-#### Alterado
-- `useUnreadMessages.ts` expandido com mais dados
-- `DashboardLayout.tsx` com MessageBadge no header
-
-#### Status Atualizado
-- useUnreadMessages integrado: ❌ Não → ✅ Sim
-- Badge de mensagens no header: ❌ Não → ✅ Sim
-
-### [2025-11-27] - Fase 21: Financial com Dados Reais
-#### Adicionado
-- Tabela `transactions` no Supabase
-- Tabela `financial_daily_summary`
-- Service `adminFinancial.ts` com dados reais
-- Página `/admin/financial` atualizada
-- Seed de dados para testes financeiros
-- Exportação de relatórios (CSV)
-
-#### Alterado
-- Dashboard financeiro agora consome dados reais
-- Adicionado tratamento de erro para tabelas inexistentes
-
-#### Status Atualizado
-- Dashboard Financeiro: ❌ Mock → ✅ Real
-
-### [2025-11-26] - Fase 20: Sistema de Notificações
-#### Adicionado
-- Tabela `notifications` no Supabase
-- Tabela `notification_preferences`
-- Service `notificationService.ts`
-- Hook `useNotifications.ts` com real-time
-- Componente `NotificationDropdown.tsx`
-- Página `/notifications` para ver todas
-- Triggers para notificações automáticas
-- Badge de notificações no header
-
-#### Alterado
-- DashboardLayout.tsx com header e sino de notificações
-
-#### Status Atualizado
-- Sistema de Notificações: ❌ Não existe → ✅ Completo
-
-### [2025-11-26] - Fase 19: Analytics Completo
-#### Adicionado
-- Tabelas de analytics no Supabase
-- Aba "Qualidade" com métricas completas
-- Exportação de relatórios em CSV
-- Gráficos de tendência de qualidade
-- Ranking de editores por qualidade
-
-#### Alterado
-- Analytics.tsx agora carrega métricas de qualidade
-- adminAnalytics.ts com novas funções
-
-#### Status Atualizado
-- Analytics:  Parcial → ✅ Completo
-
-### [2025-11-26] - Deploy e Analytics Implementados
-#### Adicionado
-- ✅ Sistema de Analytics completo (Fase 18)
-  - Schema SQL com 5 tabelas
-  - Services para queries analíticas
-  - Dashboard com 6 abas (Overview, Growth, Projects, Editors, Financial, Quality)
-  - Gráficos interativos com Recharts
-- ✅ GitHub Pages deployment configurado
-  - Workflow automático (`.github/workflows/deploy.yml`)
-  - Base path configurado para `/Frame-up-antigravity/`
-  - Documentação completa (DEPLOY.md)
-- ✅ Página de gestão de usuários admin
-  - Listagem com filtros
-  - Estatísticas de usuários
-  - Integração com permissões
-
-#### Identificado
-- 🟡 Financial com dados mock (Próximo passo)
-- 🟡 Hook useUnreadMessages não integrado
-- ❌ Sistema de notificações inexistente
-
-### [2025-11-26] - Análise Inicial
-#### Analisado
-- Estrutura completa do projeto (40+ páginas)
-- Todos os services e hooks
-- Migrations do banco
-- Design system
-
----
-
-## 🔗 LINKS ÚTEIS
-
-- **Repositório:** https://github.com/danielcazi/Frame-up-antigravity
-- **Deploy:** https://danielcazi.github.io/Frame-up-antigravity
-- **GitHub Actions:** Configurado para deploy automático
-- **Lovable:** https://lovable.dev/projects/442ad423-a1a7-4328-b4ef-c464c44562b0
-- **Supabase:** https://ojgmtkzvpbrulxfklkmr.supabase.co
-- **Stripe:** [Configurar no projeto]
-
-### Deploy
-- ✅ GitHub Pages configurado
-- ✅ Workflow automático (`.github/workflows/deploy.yml`)
-- ⚠️ Secrets precisam ser configurados no GitHub
-- ⚠️ GitHub Pages precisa ser habilitado nas configurações
-
----
-
-## 📋 COMO USAR ESTE DOCUMENTO
-
-### Para Continuar Desenvolvimento com IA:
-1. Atualize este arquivo quando fizer mudanças significativas
-2. No início de cada sessão, envie este arquivo
-3. A IA terá contexto completo do projeto
-
-### Para Atualizar:
-```markdown
-## 📝 CHANGELOG
-
-### [DATA] - Descrição
-#### Adicionado
-- Item adicionado
-
-#### Alterado
-- Item alterado
-
-#### Corrigido
-- Bug corrigido
-```
-
----
-
-*Documento gerado em 26/11/2025 por análise completa do projeto*
+2. **[ ] Internacionalização (i18n)**
+   - Preparar estrutura para EN/ES

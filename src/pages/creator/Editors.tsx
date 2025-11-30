@@ -45,7 +45,14 @@ const CreatorEditors = () => {
         try {
             let query = supabase
                 .from('users')
-                .select('*')
+                .select(`
+                    *,
+                    editor_profiles (
+                        bio,
+                        specialties,
+                        rating_average
+                    )
+                `)
                 .eq('user_type', 'editor');
 
             if (searchTerm) {
@@ -56,7 +63,17 @@ const CreatorEditors = () => {
 
             if (error) throw error;
 
-            setEditors(data || []);
+            const mappedEditors = data?.map((user: any) => {
+                const profile = Array.isArray(user.editor_profiles) ? user.editor_profiles[0] : user.editor_profiles;
+                return {
+                    ...user,
+                    bio: profile?.bio,
+                    specialties: profile?.specialties,
+                    rating: profile?.rating_average
+                };
+            }) || [];
+
+            setEditors(mappedEditors);
         } catch (error) {
             console.error('Error fetching editors:', error);
         } finally {
