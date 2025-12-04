@@ -9,10 +9,10 @@ import {
     CheckSquare,
     Tag,
     BarChart3,
-    LogOut,
     Menu,
     X,
 } from 'lucide-react';
+import LogoutButton from '@/components/layout/LogoutButton';
 import { useState } from 'react';
 import { Permission } from '@/types/admin';
 
@@ -96,10 +96,7 @@ export default function AdminLayout() {
         (item) => !item.permission || hasPermission(item.permission)
     );
 
-    const handleLogout = async () => {
-        await logout();
-        navigate('/admin/login');
-    };
+
 
     return (
         <div className="min-h-screen bg-gray-50 flex">
@@ -162,13 +159,12 @@ export default function AdminLayout() {
 
                 {/* Footer */}
                 <div className="p-4 border-t border-gray-800">
-                    <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
-                    >
-                        <LogOut className="w-5 h-5" />
-                        {sidebarOpen && <span className="text-sm">Sair</span>}
-                    </button>
+                    <LogoutButton
+                        redirectTo="/admin/login"
+                        className="w-full justify-start text-gray-300 hover:bg-gray-800 hover:text-white px-4 py-3 h-auto"
+                        iconClassName="w-5 h-5 mr-3"
+                        showLabel={sidebarOpen}
+                    />
                 </div>
             </aside>
 

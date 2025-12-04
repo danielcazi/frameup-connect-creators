@@ -183,7 +183,13 @@ function Chat() {
                 },
                 (payload) => {
                     const newMessage = payload.new as Message;
-                    setMessages((prev) => [...prev, newMessage]);
+                    setMessages((prev) => {
+                        // Evitar duplicatas se a mensagem já foi adicionada manualmente
+                        if (prev.some(msg => msg.id === newMessage.id)) {
+                            return prev;
+                        }
+                        return [...prev, newMessage];
+                    });
 
                     // Se não é a própria mensagem, marcar como lida
                     if (newMessage.sender_id !== user.id) {
@@ -206,7 +212,9 @@ function Chat() {
                     );
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                console.log('Realtime subscription status:', status);
+            });
 
         return () => {
             subscription.unsubscribe();
@@ -252,16 +260,23 @@ function Chat() {
                     ? project.assigned_editor_id
                     : project.creator_id;
 
-            const { error } = await supabase.from('messages').insert({
-                project_id: id,
-                sender_id: user.id,
-                receiver_id: receiverId,
-                message_text: text,
-            });
+            const { data, error } = await supabase
+                .from('messages')
+                .insert({
+                    project_id: id,
+                    sender_id: user.id,
+                    receiver_id: receiverId,
+                    message_text: text,
+                })
+                .select()
+                .single();
 
             if (error) throw error;
 
-            // Mensagem será adicionada via real-time subscription
+            // Adicionar mensagem localmente para feedback instantâneo
+            if (data) {
+                setMessages((prev) => [...prev, data as Message]);
+            }
         } catch (error: any) {
             console.error('Error sending message:', error);
             toast({
@@ -355,13 +370,13 @@ function Chat() {
                             <div className="h-8 w-px bg-border" />
 
                             <Avatar className="w-10 h-10">
-                                <AvatarImage src={otherUser.profile_photo_url} alt={otherUser.full_name} />
-                                <AvatarFallback>{getInitials(otherUser.full_name)}</AvatarFallback>
+                                <AvatarImage src={otherUser?.profile_photo_url} alt={otherUser?.full_name} />
+                                <AvatarFallback>{getInitials(otherUser?.full_name || '?')}</AvatarFallback>
                             </Avatar>
 
                             <div>
-                                <p className="font-semibold text-foreground">{otherUser.full_name}</p>
-                                <p className="text-sm text-muted-foreground">@{otherUser.username}</p>
+                                <p className="font-semibold text-foreground">{otherUser?.full_name || 'Usuário'}</p>
+                                <p className="text-sm text-muted-foreground">@{otherUser?.username || 'usuario'}</p>
                             </div>
                         </div>
 
@@ -417,12 +432,12 @@ function Chat() {
                                                 senderName={
                                                     message.sender_id === user?.id
                                                         ? 'Você'
-                                                        : otherUser.full_name
+                                                        : otherUser?.full_name || 'Usuário'
                                                 }
                                                 senderAvatar={
                                                     message.sender_id === user?.id
                                                         ? user.user_metadata?.profile_photo_url
-                                                        : otherUser.profile_photo_url
+                                                        : otherUser?.profile_photo_url
                                                 }
                                             />
                                         ))}

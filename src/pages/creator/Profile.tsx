@@ -116,7 +116,7 @@ function CreatorProfile() {
         setSaving(true);
 
         try {
-            // Atualizar users table
+            // 1. Atualizar users table
             const { error: userError } = await supabase
                 .from('users')
                 .update({
@@ -133,24 +133,41 @@ function CreatorProfile() {
                 throw userError;
             }
 
-            // Upsert creator_profiles
-            // Se a tabela não existir, isso vai falhar.
-            // Vamos tentar. Se falhar, paciência (ou criamos a tabela).
-            const { error: profileError } = await supabase
+            // 2. Atualizar ou Criar creator_profiles
+            const commonData = {
+                bio: bio.trim(),
+                city: city.trim(),
+                state: state.trim(),
+            };
+
+            let profileError;
+
+            // Tentar UPDATE primeiro (seguro para RLS)
+            const { data: updated, error: updateError } = await supabase
                 .from('creator_profiles')
-                .upsert({
-                    user_id: user?.id,
-                    bio: bio.trim(),
-                    city: city.trim(),
-                    state: state.trim(),
-                });
+                .update(commonData)
+                .eq('user_id', user?.id)
+                .select();
+
+            if (updateError) {
+                profileError = updateError;
+            } else if (updated && updated.length > 0) {
+                // Update funcionou
+                profileError = null;
+            } else {
+                // Se update não afetou nenhuma linha, tentar INSERT
+                const { error: insertError } = await supabase
+                    .from('creator_profiles')
+                    .insert({
+                        user_id: user?.id,
+                        ...commonData
+                    });
+                profileError = insertError;
+            }
 
             if (profileError) {
-                console.warn('Erro ao salvar creator_profiles (pode não existir):', profileError);
-                // Se o erro for "relation does not exist", ignoramos para não bloquear o usuário de salvar o nome/foto
-                if (profileError.code !== '42P01') { // undefined table
-                    throw profileError;
-                }
+                console.warn('Erro ao salvar creator_profiles:', profileError);
+                throw profileError;
             }
 
             toast({
@@ -164,6 +181,10 @@ function CreatorProfile() {
                 username: username.trim().toLowerCase(),
                 profile_photo_url: profilePhoto || null,
             });
+
+            // Recarregar perfil
+            loadProfile();
+
         } catch (error: any) {
             console.error('Error saving profile:', error);
             toast({

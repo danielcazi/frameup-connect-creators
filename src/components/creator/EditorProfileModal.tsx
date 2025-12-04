@@ -139,7 +139,7 @@ function EditorProfileModal({
                     <div className="flex items-start gap-4 pb-6 border-b border-border">
                         <Avatar className="w-20 h-20">
                             <AvatarImage src={editor.profile_photo_url} alt={editor.full_name} />
-                            <AvatarFallback className="text-2xl">{editor.full_name.charAt(0).toUpperCase()}</AvatarFallback>
+                            <AvatarFallback className="text-2xl">{editor.full_name?.charAt(0)?.toUpperCase() || '?'}</AvatarFallback>
                         </Avatar>
 
                         <div className="flex-1">
@@ -153,23 +153,23 @@ function EditorProfileModal({
                                 <div className="flex items-center gap-1.5">
                                     <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                                     <span className="text-lg font-semibold">
-                                        {profile.rating_average.toFixed(1)}
+                                        {profile?.rating_average?.toFixed(1) || '0.0'}
                                     </span>
                                     <span className="text-sm text-muted-foreground">
-                                        ({profile.total_reviews} avaliações)
+                                        ({profile?.total_reviews || 0} avaliações)
                                     </span>
                                 </div>
 
                                 <div className="flex items-center gap-1.5 text-muted-foreground">
                                     <Briefcase className="w-5 h-5" />
-                                    <span className="font-medium">{profile.total_projects}</span>
+                                    <span className="font-medium">{profile?.total_projects || 0}</span>
                                     <span className="text-sm">projetos concluídos</span>
                                 </div>
 
                                 <div className="flex items-center gap-1.5 text-muted-foreground">
                                     <MapPin className="w-5 h-5" />
                                     <span className="text-sm">
-                                        {profile.city}, {profile.state}
+                                        {profile?.city || 'N/A'}, {profile?.state || ''}
                                     </span>
                                 </div>
                             </div>
@@ -177,7 +177,7 @@ function EditorProfileModal({
                     </div>
 
                     {/* Bio */}
-                    {profile.bio && (
+                    {profile?.bio && (
                         <div>
                             <h3 className="text-lg font-semibold text-foreground mb-3">Sobre</h3>
                             <p className="text-muted-foreground leading-relaxed">{profile.bio}</p>
@@ -190,7 +190,7 @@ function EditorProfileModal({
                             Especialidades
                         </h3>
                         <div className="flex flex-wrap gap-2">
-                            {profile.specialties.map((specialty) => (
+                            {profile?.specialties?.map((specialty) => (
                                 <Badge key={specialty} variant="default">
                                     {specialty}
                                 </Badge>
@@ -205,7 +205,7 @@ function EditorProfileModal({
                             Softwares
                         </h3>
                         <div className="flex flex-wrap gap-2">
-                            {profile.software_skills.map((software) => (
+                            {profile?.software_skills?.map((software) => (
                                 <Badge key={software} variant="secondary">
                                     {software}
                                 </Badge>

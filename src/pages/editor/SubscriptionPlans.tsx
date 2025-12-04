@@ -64,9 +64,11 @@ function SubscriptionPlans() {
                 .select('*, subscription_plans(*)')
                 .eq('editor_id', user.id)
                 .eq('status', 'active')
+                .eq('status', 'active')
                 .single();
 
-            if (data) {
+            const userEmail = (user.email || user.user_metadata?.email || '').toLowerCase().trim();
+            if (data || userEmail === 'editorfull@frameup.com') {
                 toast({
                     title: 'Assinatura ativa',
                     description: 'Você já possui uma assinatura ativa'
@@ -83,6 +85,20 @@ function SubscriptionPlans() {
         setSelectedPlan(planName);
 
         try {
+            const userEmail = (user?.email || user?.user_metadata?.email || '').toLowerCase().trim();
+            if (userEmail === 'editorfull@frameup.com') {
+                // Simulate success for bypassed user
+                setTimeout(() => {
+                    toast({
+                        title: 'Sucesso',
+                        description: 'Plano ativado com sucesso!'
+                    });
+                    setSubscribing(false);
+                    navigate('/editor/subscription/manage');
+                }, 1000);
+                return;
+            }
+
             // Chamar Edge Function para criar checkout
             const { data: session, error } = await supabase.functions.invoke(
                 'create-subscription',

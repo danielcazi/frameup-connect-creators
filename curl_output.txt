@@ -1,0 +1,79 @@
+Note: Unnecessary use of -X or --request, POST is already inferred.
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0* Host pkvkqceeycbjrhuomsdi.supabase.co:443 was resolved.
+* IPv6: (none)
+* IPv4: 172.64.149.246, 104.18.38.10
+*   Trying 172.64.149.246:443...
+* Connected to pkvkqceeycbjrhuomsdi.supabase.co (172.64.149.246) port 443
+* ALPN: curl offers h2,http/1.1
+* (304) (OUT), TLS handshake, Client hello (1):
+} [337 bytes data]
+*  CAfile: /etc/ssl/cert.pem
+*  CApath: none
+* (304) (IN), TLS handshake, Server hello (2):
+{ [122 bytes data]
+* (304) (IN), TLS handshake, Unknown (8):
+{ [19 bytes data]
+* (304) (IN), TLS handshake, Certificate (11):
+{ [2530 bytes data]
+* (304) (IN), TLS handshake, CERT verify (15):
+{ [79 bytes data]
+* (304) (IN), TLS handshake, Finished (20):
+{ [36 bytes data]
+* (304) (OUT), TLS handshake, Finished (20):
+} [36 bytes data]
+* SSL connection using TLSv1.3 / AEAD-CHACHA20-POLY1305-SHA256 / [blank] / UNDEF
+* ALPN: server accepted h2
+* Server certificate:
+*  subject: CN=supabase.co
+*  start date: Nov  4 05:55:42 2025 GMT
+*  expire date: Feb  2 06:55:37 2026 GMT
+*  subjectAltName: host "pkvkqceeycbjrhuomsdi.supabase.co" matched cert's "*.supabase.co"
+*  issuer: C=US; O=Google Trust Services; CN=WE1
+*  SSL certificate verify ok.
+* using HTTP/2
+* [HTTP/2] [1] OPENED stream for https://pkvkqceeycbjrhuomsdi.supabase.co/auth/v1/token?grant_type=password
+* [HTTP/2] [1] [:method: POST]
+* [HTTP/2] [1] [:scheme: https]
+* [HTTP/2] [1] [:authority: pkvkqceeycbjrhuomsdi.supabase.co]
+* [HTTP/2] [1] [:path: /auth/v1/token?grant_type=password]
+* [HTTP/2] [1] [user-agent: curl/8.7.1]
+* [HTTP/2] [1] [accept: */*]
+* [HTTP/2] [1] [apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrdmtxY2VleWNianJodW9tc2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3NTgwNzIsImV4cCI6MjA3OTMzNDA3Mn0.ThSgqoJiUrUc2bKd7eKKfd7y80H-egDGs75g8j1NtS0]
+* [HTTP/2] [1] [content-type: application/json]
+* [HTTP/2] [1] [content-length: 66]
+> POST /auth/v1/token?grant_type=password HTTP/2
+> Host: pkvkqceeycbjrhuomsdi.supabase.co
+> User-Agent: curl/8.7.1
+> Accept: */*
+> apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrdmtxY2VleWNianJodW9tc2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3NTgwNzIsImV4cCI6MjA3OTMzNDA3Mn0.ThSgqoJiUrUc2bKd7eKKfd7y80H-egDGs75g8j1NtS0
+> Content-Type: application/json
+> Content-Length: 66
+> 
+} [66 bytes data]
+* upload completely sent off: 66 bytes
+< HTTP/2 200 
+< date: Wed, 03 Dec 2025 12:26:41 GMT
+< content-type: application/json
+< server: cloudflare
+< cf-ray: 9a830dc88e2ea61a-GIG
+< cf-cache-status: DYNAMIC
+< strict-transport-security: max-age=31536000; includeSubDomains; preload
+< vary: Origin, Accept-Encoding
+< x-content-type-options: nosniff
+< sb-auth-refresh-token-prefix: ybvpa
+< sb-auth-session-id: c8b4ff5b-bcf4-460f-838b-d3e5369b391d
+< sb-auth-user-id: a61b9bb5-e036-46e1-bc5a-6205d82dfcba
+< sb-gateway-version: 1
+< sb-project-ref: pkvkqceeycbjrhuomsdi
+< sb-request-id: 019ae42d-d959-790a-a777-1c5350ab5872
+< x-envoy-attempt-count: 1
+< x-envoy-upstream-service-time: 91
+< set-cookie: __cf_bm=EJJ8sbmnPcJv5XHkALe3_bTUcLy_7v.AufiQa5kuGv4-1764764801-1.0.1.1-7RPC9G1GvPiWh_.A0YwmLlsPeJjP.5W_XFxR_3EF_v83sPvaxyRkQoN5y_NHTJNqUxewhD3O1M.s3Lreek.Daem_v6pcILPbwyNR7Vczu5g; path=/; expires=Wed, 03-Dec-25 12:56:41 GMT; domain=.supabase.co; HttpOnly; Secure; SameSite=None
+< alt-svc: h3=":443"; ma=86400
+< 
+100    66    0     0  100    66      0    106 --:--:-- --:--:-- --:--:--   106{ [1360 bytes data]
+100  1921    0  1855  100    66   2981    106 --:--:-- --:--:-- --:--:--  3083
+* Connection #0 to host pkvkqceeycbjrhuomsdi.supabase.co left intact
+{"access_token":"eyJhbGciOiJIUzI1NiIsImtpZCI6Ikt3cUVvWHd6eklvWThlcUMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL3BrdmtxY2VleWNianJodW9tc2RpLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiJhNjFiOWJiNS1lMDM2LTQ2ZTEtYmM1YS02MjA1ZDgyZGZjYmEiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzY0NzY4NDAxLCJpYXQiOjE3NjQ3NjQ4MDEsImVtYWlsIjoiY3JlYXRvcmZ1bGxAZnJhbWV1cC5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc2NDc2NDgwMX1dLCJzZXNzaW9uX2lkIjoiYzhiNGZmNWItYmNmNC00NjBmLTgzOGItZDNlNTM2OWIzOTFkIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.Q7KiHXJ89BwiGaa70coWyDGKWiqD8F5fOG42VYSKV5E","token_type":"bearer","expires_in":3600,"expires_at":1764768401,"refresh_token":"ybvpar7vil4r","user":{"id":"a61b9bb5-e036-46e1-bc5a-6205d82dfcba","aud":"authenticated","role":"authenticated","email":"creatorfull@frameup.com","email_confirmed_at":"2025-12-02T22:32:04.848536Z","phone":"","confirmed_at":"2025-12-02T22:32:04.848536Z","last_sign_in_at":"2025-12-03T12:26:41.7849811Z","app_metadata":{"provider":"email","providers":["email"]},"user_metadata":{"email_verified":true},"identities":[{"identity_id":"5527ad5c-4429-4281-b843-97e3feea859a","id":"a61b9bb5-e036-46e1-bc5a-6205d82dfcba","user_id":"a61b9bb5-e036-46e1-bc5a-6205d82dfcba","identity_data":{"email":"creatorfull@frameup.com","email_verified":false,"phone_verified":false,"sub":"a61b9bb5-e036-46e1-bc5a-6205d82dfcba"},"provider":"email","last_sign_in_at":"2025-12-02T22:32:04.834121Z","created_at":"2025-12-02T22:32:04.834187Z","updated_at":"2025-12-02T22:32:04.834187Z","email":"creatorfull@frameup.com"}],"created_at":"2025-12-02T22:32:04.790899Z","updated_at":"2025-12-03T12:26:41.789666Z","is_anonymous":false},"weak_password":null}

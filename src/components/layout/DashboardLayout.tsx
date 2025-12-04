@@ -12,12 +12,23 @@ import {
   Menu,
   X,
   Star,
-  RefreshCw
+  RefreshCw,
+  Search
 } from 'lucide-react';
 import Badge from '@/components/common/Badge';
 import SubscriptionBanner from '@/components/editor/SubscriptionBanner';
 import NotificationDropdown from '@/components/notifications/NotificationDropdown';
 import MessageBadge from '@/components/messages/MessageBadge';
+import LogoutButton from './LogoutButton';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { TestModeBanner } from '@/components/TestModeBanner';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -54,8 +65,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     ]
     : [
       { label: 'Dashboard', path: '/editor/dashboard', icon: Home },
+      { label: 'Encontrar Projetos', path: '/editor/projects', icon: Search },
       { label: 'Propostas', path: '/editor/proposals', icon: RefreshCw },
-      { label: 'Meus Projetos', path: '/editor/projects', icon: FolderOpen },
+      { label: 'Meus Projetos', path: '/editor/my-projects', icon: FolderOpen },
       { label: 'Mensagens', path: '/editor/messages', icon: MessageSquare, badge: 0 },
       { label: 'Perfil', path: '/editor/profile', icon: User },
       { label: 'Assinatura', path: '/editor/subscription/manage', icon: CreditCard },
@@ -89,6 +101,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Test Mode Banner */}
+      <TestModeBanner />
+
       {/* Subscription Banner */}
       <SubscriptionBanner />
 
@@ -97,6 +112,15 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         <div className="flex items-center justify-between h-full px-4 lg:px-6">
           {/* Logo */}
           <div className="flex items-center gap-3">
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="lg:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg hover:bg-accent transition-colors"
+              aria-label="Abrir menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
             <RouterNavLink to={userType === 'creator' ? '/creator/dashboard' : '/editor/dashboard'} className="flex items-center gap-2">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                 <span className="text-primary-foreground font-bold text-sm">FU</span>
@@ -117,31 +141,47 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             <div className="hidden sm:block w-px h-6 bg-border mx-1" />
 
             {/* User Menu */}
-            <RouterNavLink
-              to={userType === 'creator' ? '/creator/profile' : '/editor/profile'}
-              className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent transition-colors"
-            >
-              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-muted-foreground" />
-              </div>
-            </RouterNavLink>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent transition-colors outline-none">
+                  <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                    <User className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <RouterNavLink
+                    to={userType === 'creator' ? '/creator/profile' : '/editor/profile'}
+                    className="w-full cursor-pointer"
+                  >
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Perfil</span>
+                  </RouterNavLink>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <LogoutButton
+                    variant="ghost"
+                    className="w-full justify-start h-8 px-2"
+                    iconClassName="w-4 h-4 mr-2"
+                  />
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
 
-      {/* Mobile Menu Button */}
-      <button
-        onClick={() => setIsMobileSidebarOpen(true)}
-        className="fixed top-20 left-4 z-40 lg:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg bg-background border border-border shadow-sm hover:bg-accent transition-colors"
-        aria-label="Abrir menu"
-      >
-        <Menu className="w-5 h-5" />
-      </button>
-
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block fixed left-0 top-16 w-60 h-[calc(100vh-4rem)] bg-muted/30 border-r border-border overflow-y-auto">
-        <div className="p-4">
+      <aside className="hidden lg:flex flex-col fixed left-0 top-16 w-60 h-[calc(100vh-4rem)] bg-muted/30 border-r border-border">
+        <div className="p-4 flex-1 overflow-y-auto">
           <SidebarContent />
+        </div>
+        <div className="p-4 border-t border-border">
+          <LogoutButton />
         </div>
       </aside>
 
@@ -153,8 +193,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
             onClick={() => setIsMobileSidebarOpen(false)}
             aria-hidden="true"
           />
-          <aside className="fixed left-0 top-0 w-72 h-full bg-background border-r border-border z-50 lg:hidden animate-slide-in-right overflow-y-auto">
-            <div className="p-4">
+          <aside className="fixed left-0 top-0 w-72 h-full bg-background border-r border-border z-50 lg:hidden animate-slide-in-right flex flex-col">
+            <div className="p-4 flex-1 overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-semibold">Menu</h2>
                 <button
@@ -166,6 +206,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 </button>
               </div>
               <SidebarContent />
+            </div>
+            <div className="p-4 border-t border-border">
+              <LogoutButton />
             </div>
           </aside>
         </>

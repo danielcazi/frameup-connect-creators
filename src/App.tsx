@@ -13,17 +13,19 @@ import RecoverPassword from "./pages/RecoverPassword";
 import CreatorDashboard from "./pages/creator/Dashboard";
 import ProjectApplications from "./pages/creator/ProjectApplications";
 import NewProject from "./pages/creator/NewProject";
-import ReviewVideo from "./pages/creator/ReviewVideo";
+import CreatorProjectDetails from "./pages/creator/ProjectDetails";
+
 import Payment from "./pages/creator/Payment";
 import PaymentSuccess from "./pages/creator/PaymentSuccess";
 import EditorDashboard from "./pages/editor/Dashboard";
 import EditorProjects from "./pages/editor/Projects";
+import EditorMyProjects from "./pages/editor/MyProjects";
 import SubscriptionPlans from "./pages/editor/SubscriptionPlans";
 import SubscriptionSuccess from "./pages/editor/SubscriptionSuccess";
 import ManageSubscription from "./pages/editor/ManageSubscription";
 import ProjectDetails from "./pages/editor/ProjectDetails";
 import EditorPricing from "./pages/editor/Pricing";
-import DeliverVideo from "./pages/editor/DeliverVideo";
+
 import MyProfile from "./pages/editor/MyProfile";
 import EditProfile from "./pages/editor/EditProfile";
 import EditorPublicProfile from "./pages/public/EditorPublicProfile";
@@ -32,6 +34,7 @@ import Chat from "./pages/shared/Chat";
 import Messages from "./pages/shared/Messages";
 import NotFound from "./pages/NotFound";
 import SubscriptionGuard from "./components/guards/SubscriptionGuard";
+import ErrorBoundary from "./components/ErrorBoundary";
 import AdminLogin from "./pages/admin/Login";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -87,6 +90,14 @@ const App = () => (
                 }
               />
               <Route
+                path="/creator/project/:id"
+                element={
+                  <ProtectedRoute requiredUserType="creator">
+                    <CreatorProjectDetails />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/creator/project/:id/payment"
                 element={
                   <ProtectedRoute requiredUserType="creator">
@@ -118,14 +129,7 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/creator/project/:id/review"
-                element={
-                  <ProtectedRoute requiredUserType="creator">
-                    <ReviewVideo />
-                  </ProtectedRoute>
-                }
-              />
+
               <Route
                 path="/creator/project/:id/rate"
                 element={
@@ -189,7 +193,9 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredUserType="editor">
                     <SubscriptionGuard requireActive={false}>
-                      <EditorDashboard />
+                      <ErrorBoundary>
+                        <EditorDashboard />
+                      </ErrorBoundary>
                     </SubscriptionGuard>
                   </ProtectedRoute>
                 }
@@ -199,6 +205,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredUserType="editor">
                     <EditorProjects />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/editor/my-projects"
+                element={
+                  <ProtectedRoute requiredUserType="editor">
+                    <EditorMyProjects />
                   </ProtectedRoute>
                 }
               />
@@ -242,14 +256,7 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/editor/project/:id/deliver"
-                element={
-                  <ProtectedRoute requiredUserType="editor">
-                    <DeliverVideo />
-                  </ProtectedRoute>
-                }
-              />
+
               <Route
                 path="/editor/profile/edit"
                 element={

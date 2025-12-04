@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Video, Bell, MessageSquare, Menu, X, ChevronDown, LogOut, Settings, CreditCard, User } from 'lucide-react';
+import { Video, Bell, MessageSquare, Menu, X, ChevronDown, Settings, CreditCard, User } from 'lucide-react';
+import LogoutButton from '@/components/layout/LogoutButton';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
 export const Header = () => {
-  const { user, userType, signOut } = useAuth();
+  const { user, userType } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -45,10 +46,7 @@ export const Header = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    setUserMenuOpen(false);
-  };
+
 
   const getInitials = () => {
     const name = user?.user_metadata?.full_name || user?.email || '';
@@ -124,6 +122,13 @@ export const Header = () => {
                     activeClassName="text-primary font-semibold"
                   >
                     Dashboard
+                  </NavLink>
+                  <NavLink
+                    to="/editor/projects"
+                    className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    activeClassName="text-primary font-semibold"
+                  >
+                    Encontrar Projetos
                   </NavLink>
                   <NavLink
                     to="/editor/my-projects"
@@ -224,13 +229,11 @@ export const Header = () => {
                           )}
                         </div>
                         <div className="border-t border-border py-2">
-                          <button
-                            onClick={handleSignOut}
-                            className="flex w-full items-center gap-3 px-4 py-2 text-sm text-error transition-colors hover:bg-muted"
-                          >
-                            <LogOut className="h-4 w-4" />
-                            Sair
-                          </button>
+                          <LogoutButton
+                            className="w-full justify-start px-4 py-2 text-sm text-error hover:bg-muted h-auto font-normal"
+                            iconClassName="h-4 w-4 mr-3"
+                            variant="ghost"
+                          />
                         </div>
                       </div>
                     )}
@@ -270,229 +273,236 @@ export const Header = () => {
             </div>
           </div>
         </div>
-      </header>
+      </header >
 
       {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <>
-          {/* Overlay */}
-          <div
-            className="fixed inset-0 z-40 bg-black/50 md:hidden"
-            onClick={() => setMobileMenuOpen(false)}
-          />
+      {
+        mobileMenuOpen && (
+          <>
+            {/* Overlay */}
+            <div
+              className="fixed inset-0 z-40 bg-black/50 md:hidden"
+              onClick={() => setMobileMenuOpen(false)}
+            />
 
-          {/* Sidebar */}
-          <div className="fixed left-0 top-16 z-50 h-[calc(100vh-4rem)] w-64 animate-slide-in-right bg-card shadow-xl md:hidden">
-            <div className="flex h-full flex-col overflow-y-auto p-4">
-              {user ? (
-                <>
-                  {/* User Info */}
-                  <div className="mb-6 flex items-center gap-3 border-b border-border pb-4">
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={user?.user_metadata?.profile_photo_url} />
-                      <AvatarFallback className="bg-primary text-primary-foreground">
-                        {getInitials()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-semibold text-foreground">
-                        {user?.user_metadata?.full_name || 'Usuário'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{user?.email}</p>
-                    </div>
-                  </div>
-
-                  {/* Navigation Links */}
-                  <nav className="flex flex-col gap-2">
-                    {userType === 'creator' && (
-                      <>
-                        <NavLink
-                          to="/creator/dashboard"
-                          className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                          activeClassName="bg-primary/10 text-primary"
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          Início
-                        </NavLink>
-                        <NavLink
-                          to="/creator/projects"
-                          className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                          activeClassName="bg-primary/10 text-primary"
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          Projetos
-                        </NavLink>
-                        <NavLink
-                          to="/creator/editors"
-                          className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                          activeClassName="bg-primary/10 text-primary"
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          Editores
-                        </NavLink>
-                        <Button
-                          onClick={() => {
-                            navigate('/creator/project/new');
-                            setMobileMenuOpen(false);
-                          }}
-                          className="mt-4 bg-primary hover:bg-primary-hover"
-                        >
-                          + Criar Projeto
-                        </Button>
-                      </>
-                    )}
-
-                    {userType === 'editor' && (
-                      <>
-                        <NavLink
-                          to="/editor/dashboard"
-                          className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                          activeClassName="bg-primary/10 text-primary"
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          Dashboard
-                        </NavLink>
-                        <NavLink
-                          to="/editor/my-projects"
-                          className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                          activeClassName="bg-primary/10 text-primary"
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          Meus Projetos
-                        </NavLink>
-                        <NavLink
-                          to="/editor/profile/edit"
-                          className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                          activeClassName="bg-primary/10 text-primary"
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          Perfil
-                        </NavLink>
-                      </>
-                    )}
-
-                    {/* Quick Actions */}
-                    <div className="mt-6 space-y-2 border-t border-border pt-4">
-                      <button
-                        onClick={() => {
-                          navigate('/messages');
-                          setMobileMenuOpen(false);
-                        }}
-                        className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                      >
-                        <span className="flex items-center gap-3">
-                          <MessageSquare className="h-4 w-4" />
-                          Mensagens
-                        </span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          navigate('/notifications');
-                          setMobileMenuOpen(false);
-                        }}
-                        className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                      >
-                        <span className="flex items-center gap-3">
-                          <Bell className="h-4 w-4" />
-                          Notificações
-                        </span>
-                      </button>
+            {/* Sidebar */}
+            <div className="fixed left-0 top-16 z-50 h-[calc(100vh-4rem)] w-64 animate-slide-in-right bg-card shadow-xl md:hidden">
+              <div className="flex h-full flex-col overflow-y-auto p-4">
+                {user ? (
+                  <>
+                    {/* User Info */}
+                    <div className="mb-6 flex items-center gap-3 border-b border-border pb-4">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={user?.user_metadata?.profile_photo_url} />
+                        <AvatarFallback className="bg-primary text-primary-foreground">
+                          {getInitials()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-semibold text-foreground">
+                          {user?.user_metadata?.full_name || 'Usuário'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{user?.email}</p>
+                      </div>
                     </div>
 
-                    {/* Settings */}
-                    <div className="mt-auto space-y-2 border-t border-border pt-4">
-                      <button
-                        onClick={() => {
-                          navigate(userType === 'creator' ? '/creator/profile' : '/editor/profile/edit');
-                          setMobileMenuOpen(false);
-                        }}
-                        className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                      >
-                        <User className="h-4 w-4" />
-                        Meu Perfil
-                      </button>
-                      <button
-                        onClick={() => {
-                          navigate('/settings');
-                          setMobileMenuOpen(false);
-                        }}
-                        className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                      >
-                        <Settings className="h-4 w-4" />
-                        Configurações
-                      </button>
+                    {/* Navigation Links */}
+                    <nav className="flex flex-col gap-2">
+                      {userType === 'creator' && (
+                        <>
+                          <NavLink
+                            to="/creator/dashboard"
+                            className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                            activeClassName="bg-primary/10 text-primary"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            Início
+                          </NavLink>
+                          <NavLink
+                            to="/creator/projects"
+                            className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                            activeClassName="bg-primary/10 text-primary"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            Projetos
+                          </NavLink>
+                          <NavLink
+                            to="/creator/editors"
+                            className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                            activeClassName="bg-primary/10 text-primary"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            Editores
+                          </NavLink>
+                          <Button
+                            onClick={() => {
+                              navigate('/creator/project/new');
+                              setMobileMenuOpen(false);
+                            }}
+                            className="mt-4 bg-primary hover:bg-primary-hover"
+                          >
+                            + Criar Projeto
+                          </Button>
+                        </>
+                      )}
+
                       {userType === 'editor' && (
+                        <>
+                          <NavLink
+                            to="/editor/dashboard"
+                            className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                            activeClassName="bg-primary/10 text-primary"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            Dashboard
+                          </NavLink>
+                          <NavLink
+                            to="/editor/projects"
+                            className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                            activeClassName="bg-primary/10 text-primary"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            Encontrar Projetos
+                          </NavLink>
+                          <NavLink
+                            to="/editor/my-projects"
+                            className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                            activeClassName="bg-primary/10 text-primary"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            Meus Projetos
+                          </NavLink>
+                          <NavLink
+                            to="/editor/profile/edit"
+                            className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                            activeClassName="bg-primary/10 text-primary"
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            Perfil
+                          </NavLink>
+                        </>
+                      )}
+
+                      {/* Quick Actions */}
+                      <div className="mt-6 space-y-2 border-t border-border pt-4">
                         <button
                           onClick={() => {
-                            navigate('/editor/subscription');
+                            navigate('/messages');
+                            setMobileMenuOpen(false);
+                          }}
+                          className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                        >
+                          <span className="flex items-center gap-3">
+                            <MessageSquare className="h-4 w-4" />
+                            Mensagens
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigate('/notifications');
+                            setMobileMenuOpen(false);
+                          }}
+                          className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                        >
+                          <span className="flex items-center gap-3">
+                            <Bell className="h-4 w-4" />
+                            Notificações
+                          </span>
+                        </button>
+                      </div>
+
+                      {/* Settings */}
+                      <div className="mt-auto space-y-2 border-t border-border pt-4">
+                        <button
+                          onClick={() => {
+                            navigate(userType === 'creator' ? '/creator/profile' : '/editor/profile/edit');
                             setMobileMenuOpen(false);
                           }}
                           className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
                         >
-                          <CreditCard className="h-4 w-4" />
-                          Assinatura
+                          <User className="h-4 w-4" />
+                          Meu Perfil
                         </button>
-                      )}
-                      <button
-                        onClick={handleSignOut}
-                        className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-error transition-colors hover:bg-muted"
+                        <button
+                          onClick={() => {
+                            navigate('/settings');
+                            setMobileMenuOpen(false);
+                          }}
+                          className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                        >
+                          <Settings className="h-4 w-4" />
+                          Configurações
+                        </button>
+                        {userType === 'editor' && (
+                          <button
+                            onClick={() => {
+                              navigate('/editor/subscription');
+                              setMobileMenuOpen(false);
+                            }}
+                            className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                          >
+                            <CreditCard className="h-4 w-4" />
+                            Assinatura
+                          </button>
+                        )}
+                        <LogoutButton
+                          className="w-full justify-start px-4 py-3 text-sm font-medium text-error hover:bg-muted h-auto"
+                          iconClassName="h-4 w-4 mr-3"
+                          variant="ghost"
+                        />
+                      </div>
+                    </nav>
+                  </>
+                ) : (
+                  <nav className="flex flex-col gap-4">
+                    <a
+                      href="#como-funciona"
+                      className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Como Funciona
+                    </a>
+                    <a
+                      href="#precos"
+                      className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Preços
+                    </a>
+                    <a
+                      href="#contato"
+                      className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Contato
+                    </a>
+                    <div className="mt-4 space-y-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          navigate('/login');
+                          setMobileMenuOpen(false);
+                        }}
+                        className="w-full"
                       >
-                        <LogOut className="h-4 w-4" />
-                        Sair
-                      </button>
+                        Entrar
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          navigate('/cadastro');
+                          setMobileMenuOpen(false);
+                        }}
+                        className="w-full bg-primary hover:bg-primary-hover"
+                      >
+                        Cadastrar
+                      </Button>
                     </div>
                   </nav>
-                </>
-              ) : (
-                <nav className="flex flex-col gap-4">
-                  <a
-                    href="#como-funciona"
-                    className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Como Funciona
-                  </a>
-                  <a
-                    href="#precos"
-                    className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Preços
-                  </a>
-                  <a
-                    href="#contato"
-                    className="rounded-lg px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Contato
-                  </a>
-                  <div className="mt-4 space-y-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        navigate('/login');
-                        setMobileMenuOpen(false);
-                      }}
-                      className="w-full"
-                    >
-                      Entrar
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        navigate('/cadastro');
-                        setMobileMenuOpen(false);
-                      }}
-                      className="w-full bg-primary hover:bg-primary-hover"
-                    >
-                      Cadastrar
-                    </Button>
-                  </div>
-                </nav>
-              )}
-            </div>
-          </div>
-        </>
-      )}
+                )}
+              </div>
+            </div >
+          </>
+        )}
     </>
   );
 };

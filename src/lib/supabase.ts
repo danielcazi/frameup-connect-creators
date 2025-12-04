@@ -15,7 +15,7 @@ const createSupabaseClient = () => {
   if (supabaseUrl && supabaseAnonKey) {
     return createClient(supabaseUrl, supabaseAnonKey);
   }
-  
+
   // Return a mock client with no-op methods
   return {
     auth: {
@@ -23,7 +23,7 @@ const createSupabaseClient = () => {
       signUp: async () => ({ data: null, error: new Error('Supabase não configurado. Conecte o Lovable Cloud.') }),
       signOut: async () => ({ error: null }),
       getSession: async () => ({ data: { session: null }, error: null }),
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => { } } } }),
     },
   } as any;
 };

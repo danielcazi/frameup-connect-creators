@@ -1,44 +1,46 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Search, Filter, FolderOpen } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import ProjectCard from '@/components/creator/ProjectCard';
+import ProjectCard from '@/components/editor/ProjectCard';
 import EmptyState from '@/components/common/EmptyState';
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/useDebounce';
 
 interface Project {
     id: string;
     title: string;
-    status: string;
+    description: string;
+    video_type: string;
+    editing_style: string;
+    duration_category: string;
     base_price: number;
     deadline_days: number;
     created_at: string;
-    updated_at: string;
-    _count?: {
-        applications: number;
-    };
-    assigned_editor?: {
+    status: string;
+    users: {
         full_name: string;
         username: string;
         profile_photo_url?: string;
     };
+    _count?: {
+        applications: number;
+    };
 }
 
-const CreatorProjects = () => {
+const EditorMyProjects = () => {
     const navigate = useNavigate();
     const { user, loading: authLoading } = useAuth();
     const { toast } = useToast();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('all');
-    const [sortBy, setSortBy] = useState('recent');
     const [searchTerm, setSearchTerm] = useState('');
     const debouncedSearch = useDebounce(searchTerm, 500);
 
@@ -50,26 +52,31 @@ const CreatorProjects = () => {
 
     useEffect(() => {
         if (user) {
-            fetchProjects();
+            fetchMyProjects();
         }
-    }, [user, statusFilter, sortBy, debouncedSearch]);
+    }, [user, statusFilter, debouncedSearch]);
 
-    const fetchProjects = async () => {
+    const fetchMyProjects = async () => {
         if (!user) return;
 
         setLoading(true);
         try {
+            // Fetch projects where the editor is assigned OR has an application
+            // For simplicity, let's fetch projects where they are assigned first.
+            // If we want to show applications too, we might need a different query or tab.
+            // Let's assume "Meus Projetos" means projects they are working on or finished.
+
             let query = supabase
                 .from('projects')
                 .select(`
           *,
-          assigned_editor:users!assigned_editor_id(
+          users:creator_id (
             full_name,
             username,
             profile_photo_url
           )
         `)
-                .eq('creator_id', user.id);
+                .eq('assigned_editor_id', user.id);
 
             // Apply status filter
             if (statusFilter !== 'all') {
@@ -81,47 +88,11 @@ const CreatorProjects = () => {
                 query = query.ilike('title', `%${debouncedSearch}%`);
             }
 
-            // Apply sorting
-            query = query.order('created_at', { ascending: sortBy === 'oldest' });
-
             const { data, error } = await query;
 
             if (error) throw error;
 
-            // Load application counts for each project
-            const projectIds = data?.map(p => p.id) || [];
-            let applicationCounts: Record<string, number> = {};
-
-            if (projectIds.length > 0) {
-                const { data: applicationsData } = await supabase
-                    .from('project_applications')
-                    .select('project_id')
-                    .in('project_id', projectIds);
-
-                applicationCounts = applicationsData?.reduce((acc, app) => {
-                    acc[app.project_id] = (acc[app.project_id] || 0) + 1;
-                    return acc;
-                }, {} as Record<string, number>) || {};
-            }
-
-            // Load reviewed project IDs
-            const { data: reviewsData } = await supabase
-                .from('reviews')
-                .select('project_id')
-                .eq('reviewer_id', user.id);
-
-            const reviewedProjectIds = new Set(reviewsData?.map(r => r.project_id));
-
-            // Transform projects to include _count and has_reviewed
-            const projectsWithCounts = data?.map(project => ({
-                ...project,
-                _count: {
-                    applications: applicationCounts[project.id] || 0
-                },
-                has_reviewed: reviewedProjectIds.has(project.id)
-            })) || [];
-
-            setProjects(projectsWithCounts);
+            setProjects(data || []);
         } catch (error) {
             console.error('Error fetching projects:', error);
             toast({
@@ -132,10 +103,6 @@ const CreatorProjects = () => {
         } finally {
             setLoading(false);
         }
-    };
-
-    const handleNewProject = () => {
-        navigate('/creator/project/new');
     };
 
     if (authLoading) {
@@ -151,14 +118,16 @@ const CreatorProjects = () => {
 
     return (
         <DashboardLayout
-            userType="creator"
+            userType="editor"
             title="Meus Projetos"
-            subtitle="Gerencie todos os seus projetos"
+            subtitle="Gerencie os projetos em que você está trabalhando"
             headerAction={
-                <Button onClick={handleNewProject}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Criar Projeto
-                </Button>
+                projects.length > 0 ? (
+                    <Button onClick={() => navigate('/editor/projects')}>
+                        <Search className="w-4 h-4 mr-2" />
+                        Encontrar Projetos
+                    </Button>
+                ) : undefined
             }
         >
             {/* Filters Section */}
@@ -170,7 +139,7 @@ const CreatorProjects = () => {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10"
-                        aria-label="Buscar projetos"
+                        aria-label="Buscar meus projetos"
                     />
                 </div>
 
@@ -184,55 +153,53 @@ const CreatorProjects = () => {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Todos os Status</SelectItem>
-                            <SelectItem value="open">Aguardando Editor</SelectItem>
                             <SelectItem value="in_progress">Em Andamento</SelectItem>
                             <SelectItem value="in_review">Em Revisão</SelectItem>
                             <SelectItem value="completed">Concluídos</SelectItem>
                             <SelectItem value="cancelled">Cancelados</SelectItem>
                         </SelectContent>
                     </Select>
-
-                    <Select value={sortBy} onValueChange={setSortBy}>
-                        <SelectTrigger className="w-full md:w-[150px]">
-                            <SelectValue placeholder="Ordenar" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="recent">Mais Recente</SelectItem>
-                            <SelectItem value="oldest">Mais Antigo</SelectItem>
-                        </SelectContent>
-                    </Select>
                 </div>
             </div>
 
             {/* Projects List */}
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {loading && (
                     <>
-                        <Skeleton className="h-32 w-full" />
-                        <Skeleton className="h-32 w-full" />
-                        <Skeleton className="h-32 w-full" />
+                        <Skeleton className="h-64 w-full" />
+                        <Skeleton className="h-64 w-full" />
+                        <Skeleton className="h-64 w-full" />
                     </>
                 )}
 
                 {!loading && projects.length === 0 && (
-                    <EmptyState
-                        illustration="projects"
-                        title={searchTerm ? "Nenhum projeto encontrado" : "Nenhum projeto ainda"}
-                        description={searchTerm ? "Tente buscar com outros termos." : "Crie seu primeiro projeto e encontre o editor perfeito para seu conteúdo."}
-                        action={!searchTerm ? {
-                            label: "Criar Primeiro Projeto",
-                            onClick: handleNewProject,
-                            variant: "default",
-                        } : undefined}
-                    />
+                    <div className="col-span-full">
+                        <EmptyState
+                            illustration="projects"
+                            title={searchTerm ? "Nenhum projeto encontrado" : "Nenhum projeto ativo"}
+                            description={searchTerm ? "Tente buscar com outros termos." : "Você ainda não tem projetos atribuídos. Vá para o Dashboard para encontrar novos projetos."}
+                            action={!searchTerm ? {
+                                label: "Encontrar Projetos",
+                                onClick: () => navigate('/editor/projects'),
+                                variant: "default",
+                            } : undefined}
+                        />
+                    </div>
                 )}
 
                 {!loading && projects.map(project => (
-                    <ProjectCard key={project.id} project={project} />
+                    <ProjectCard
+                        key={project.id}
+                        project={project}
+                        hasApplied={true} // Since it's assigned, effectively applied/accepted
+                        canApply={false} // Already assigned
+                        onApply={() => navigate(`/editor/project/${project.id}`)} // Navigate to details
+                        showStatus={true}
+                    />
                 ))}
             </div>
         </DashboardLayout>
     );
 };
 
-export default CreatorProjects;
+export default EditorMyProjects;

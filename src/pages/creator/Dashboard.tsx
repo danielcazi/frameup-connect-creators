@@ -10,6 +10,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import MetricCard from '@/components/creator/MetricCard';
 import ProjectCard from '@/components/creator/ProjectCard';
 import EmptyState from '@/components/common/EmptyState';
+import { useToast } from '@/hooks/use-toast';
 
 interface Project {
   id: string;
@@ -38,6 +39,7 @@ interface Metrics {
 const CreatorDashboard = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [metrics, setMetrics] = useState<Metrics>({
     activeProjects: 0,
@@ -132,6 +134,11 @@ const CreatorDashboard = () => {
       });
     } catch (error) {
       console.error('Error fetching projects:', error);
+      toast({
+        title: "Erro ao carregar projetos",
+        description: "Não foi possível carregar seus projetos. Tente novamente.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }

@@ -53,6 +53,17 @@ interface Project {
     assigned_editor_id?: string;
 }
 
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+
 function ProjectApplications() {
     const { id } = useParams();
     const { user } = useAuth();
@@ -64,6 +75,10 @@ function ProjectApplications() {
     const [loading, setLoading] = useState(true);
     const [selectedEditor, setSelectedEditor] = useState<Application | null>(null);
     const [showProfileModal, setShowProfileModal] = useState(false);
+
+    // Confirmation Dialog State
+    const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+    const [pendingAcceptance, setPendingAcceptance] = useState<{ appId: string, editorId: string } | null>(null);
 
     useEffect(() => {
         if (id && user) {
@@ -149,42 +164,70 @@ function ProjectApplications() {
         setShowProfileModal(true);
     }
 
-    async function handleAcceptApplication(applicationId: string, editorId: string) {
-        const confirmed = window.confirm(
-            'Tem certeza que deseja selecionar este editor?\n\n' +
-            'Ao aceitar:\n' +
-            '• O editor será atribuído ao projeto\n' +
-            '• As outras candidaturas serão rejeitadas automaticamente\n' +
-            '• O projeto entrará em andamento\n' +
-            '• Esta ação não pode ser desfeita'
-        );
+    function initiateAcceptApplication(applicationId: string, editorId: string) {
+        setPendingAcceptance({ appId: applicationId, editorId });
+        setConfirmDialogOpen(true);
+    }
 
-        if (!confirmed) return;
+    async function handleConfirmAccept() {
+        if (!pendingAcceptance) return;
+        const { appId, editorId } = pendingAcceptance;
+        setConfirmDialogOpen(false);
 
         try {
-            // Chamar stored procedure (será criada no próximo prompt)
+            // Tentar chamar RPC primeiro
             const { data, error } = await supabase.rpc('accept_application', {
-                p_application_id: applicationId,
+                p_application_id: appId,
                 p_project_id: id,
                 p_editor_id: editorId,
             });
 
-            if (error) throw error;
+            let success = false;
+            if (!error && data?.[0]?.success) {
+                success = true;
+            } else {
+                // Fallback: Atualização direta se RPC falhar ou não existir
+                console.warn('RPC accept_application failed or missing, trying direct update...', error);
 
-            const result = data?.[0];
+                // 1. Atualizar projeto
+                const { error: projError } = await supabase
+                    .from('projects')
+                    .update({
+                        status: 'in_progress',
+                        assigned_editor_id: editorId
+                    })
+                    .eq('id', id);
 
-            if (result && !result.success) {
-                throw new Error(result.error_message);
+                if (projError) throw projError;
+
+                // 2. Aceitar candidatura
+                const { error: appError } = await supabase
+                    .from('project_applications')
+                    .update({ status: 'accepted' })
+                    .eq('id', appId);
+
+                if (appError) throw appError;
+
+                // 3. Rejeitar outras (opcional, mas bom manter consistência)
+                await supabase
+                    .from('project_applications')
+                    .update({ status: 'rejected' })
+                    .eq('project_id', id)
+                    .neq('id', appId);
+
+                success = true;
             }
 
-            toast({
-                title: 'Sucesso',
-                description: 'Editor selecionado com sucesso! 🎉',
-            });
+            if (success) {
+                toast({
+                    title: 'Sucesso',
+                    description: 'Editor selecionado com sucesso! 🎉',
+                });
 
-            // Recarregar dados
-            loadProject();
-            loadApplications();
+                // Recarregar dados
+                loadProject();
+                loadApplications();
+            }
         } catch (error: any) {
             console.error('Error accepting application:', error);
             toast({
@@ -192,6 +235,8 @@ function ProjectApplications() {
                 title: 'Erro',
                 description: error.message || 'Erro ao selecionar editor',
             });
+        } finally {
+            setPendingAcceptance(null);
         }
     }
 
@@ -339,7 +384,7 @@ function ProjectApplications() {
                             <div className="flex items-center gap-3">
                                 <Avatar className="w-12 h-12">
                                     <AvatarImage src={acceptedApplication.editor.profile_photo_url} alt={acceptedApplication.editor.full_name} />
-                                    <AvatarFallback>{acceptedApplication.editor.full_name.charAt(0).toUpperCase()}</AvatarFallback>
+                                    <AvatarFallback>{acceptedApplication.editor.full_name?.charAt(0)?.toUpperCase() || '?'}</AvatarFallback>
                                 </Avatar>
                                 <div>
                                     <p className="font-semibold text-foreground">
@@ -352,12 +397,12 @@ function ProjectApplications() {
                                         <div className="flex items-center gap-1">
                                             <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                                             <span className="text-sm font-medium">
-                                                {acceptedApplication.editor.editor_profiles.rating_average.toFixed(1)}
+                                                {acceptedApplication.editor.editor_profiles?.rating_average?.toFixed(1) || '0.0'}
                                             </span>
                                         </div>
                                         <span className="text-muted-foreground">•</span>
                                         <span className="text-sm text-muted-foreground">
-                                            {acceptedApplication.editor.editor_profiles.total_projects} projetos
+                                            {acceptedApplication.editor.editor_profiles?.total_projects || 0} projetos
                                         </span>
                                     </div>
                                 </div>
@@ -386,7 +431,7 @@ function ProjectApplications() {
                                         {/* Avatar */}
                                         <Avatar className="w-12 h-12">
                                             <AvatarImage src={application.editor.profile_photo_url} alt={application.editor.full_name} />
-                                            <AvatarFallback>{application.editor.full_name.charAt(0).toUpperCase()}</AvatarFallback>
+                                            <AvatarFallback>{application.editor.full_name?.charAt(0)?.toUpperCase() || '?'}</AvatarFallback>
                                         </Avatar>
 
                                         {/* Content */}
@@ -411,17 +456,17 @@ function ProjectApplications() {
                                                 <div className="flex items-center gap-1.5">
                                                     <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                                                     <span className="text-sm font-medium">
-                                                        {application.editor.editor_profiles.rating_average.toFixed(1)}
+                                                        {application.editor.editor_profiles?.rating_average?.toFixed(1) || '0.0'}
                                                     </span>
                                                     <span className="text-sm text-muted-foreground">
-                                                        ({application.editor.editor_profiles.total_reviews} avaliações)
+                                                        ({application.editor.editor_profiles?.total_reviews || 0} avaliações)
                                                     </span>
                                                 </div>
 
                                                 <div className="flex items-center gap-1.5 text-muted-foreground">
                                                     <Briefcase className="w-4 h-4" />
                                                     <span className="text-sm">
-                                                        {application.editor.editor_profiles.total_projects} projetos concluídos
+                                                        {application.editor.editor_profiles?.total_projects || 0} projetos concluídos
                                                     </span>
                                                 </div>
                                             </div>
@@ -429,9 +474,9 @@ function ProjectApplications() {
                                             {/* Location & Specialties */}
                                             <div className="flex flex-wrap gap-2 mb-3">
                                                 <Badge variant="secondary">
-                                                    {application.editor.editor_profiles.city}, {application.editor.editor_profiles.state}
+                                                    {application.editor.editor_profiles?.city || 'N/A'}, {application.editor.editor_profiles?.state || ''}
                                                 </Badge>
-                                                {application.editor.editor_profiles.specialties.slice(0, 3).map((specialty) => (
+                                                {application.editor.editor_profiles?.specialties?.slice(0, 3).map((specialty) => (
                                                     <Badge key={specialty} variant="default">
                                                         {specialty}
                                                     </Badge>
@@ -457,7 +502,7 @@ function ProjectApplications() {
 
                                                 <Button
                                                     className="bg-green-600 hover:bg-green-700 text-white"
-                                                    onClick={() => handleAcceptApplication(application.id, application.editor.id)}
+                                                    onClick={() => initiateAcceptApplication(application.id, application.editor.id)}
                                                 >
                                                     <CheckCircle className="w-4 h-4 mr-2" />
                                                     Selecionar Editor
@@ -511,7 +556,7 @@ function ProjectApplications() {
                                     <div className="flex items-center gap-3">
                                         <Avatar className="w-8 h-8">
                                             <AvatarImage src={application.editor.profile_photo_url} alt={application.editor.full_name} />
-                                            <AvatarFallback>{application.editor.full_name.charAt(0).toUpperCase()}</AvatarFallback>
+                                            <AvatarFallback>{application.editor.full_name?.charAt(0)?.toUpperCase() || '?'}</AvatarFallback>
                                         </Avatar>
                                         <div className="flex-1 min-w-0">
                                             <p className="font-medium text-foreground">
@@ -541,7 +586,7 @@ function ProjectApplications() {
                     }}
                     onAccept={(applicationId, editorId) => {
                         setShowProfileModal(false);
-                        handleAcceptApplication(applicationId, editorId);
+                        initiateAcceptApplication(applicationId, editorId);
                     }}
                     onReject={(applicationId) => {
                         setShowProfileModal(false);
@@ -549,6 +594,33 @@ function ProjectApplications() {
                     }}
                 />
             )}
+
+            {/* Confirmation Dialog */}
+            <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmar seleção de editor</AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-2">
+                            <p>Tem certeza que deseja selecionar este editor?</p>
+                            <div className="bg-muted p-3 rounded-md text-sm">
+                                <p className="font-medium mb-1">Ao aceitar:</p>
+                                <ul className="list-disc pl-4 space-y-1">
+                                    <li>O editor será atribuído ao projeto</li>
+                                    <li>As outras candidaturas serão rejeitadas automaticamente</li>
+                                    <li>O projeto entrará em andamento</li>
+                                    <li>Esta ação não pode ser desfeita</li>
+                                </ul>
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmAccept} className="bg-green-600 hover:bg-green-700">
+                            Confirmar Seleção
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </DashboardLayout>
     );
 }

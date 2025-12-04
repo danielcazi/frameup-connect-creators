@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
 import CheckoutForm from '@/components/creator/CheckoutForm';
 import { PaymentSummaryCard } from '@/components/creator/PaymentSummaryCard';
+import { Button } from '@/components/ui/button';
 
 export default function Payment() {
     const { id } = useParams();
@@ -20,6 +21,37 @@ export default function Payment() {
     const [project, setProject] = useState<any>(null);
     const [clientSecret, setClientSecret] = useState('');
     const [loading, setLoading] = useState(true);
+    const [isTestAccount, setIsTestAccount] = useState(false);
+
+    const handleTestPayment = async () => {
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('projects')
+                .update({
+                    status: 'open',
+                    payment_status: 'paid',
+                    published_at: new Date().toISOString()
+                })
+                .eq('id', project.id);
+
+            if (error) throw error;
+
+            toast({
+                title: '🧪 Modo Teste',
+                description: 'Projeto publicado com sucesso!',
+            });
+            navigate('/creator/dashboard');
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Erro',
+                description: error.message
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         async function initialize() {
@@ -50,6 +82,23 @@ export default function Payment() {
                     description: 'Este projeto já foi publicado.'
                 });
                 navigate('/creator/dashboard'); // Ou para detalhes do projeto
+                return;
+            }
+
+            // Check for test account
+            const { data: userData } = await supabase
+                .from('users')
+                .select('is_test_account, email')
+                .eq('id', user.id)
+                .single();
+
+            const userEmail = (user.email || user.user_metadata?.email || '').toLowerCase().trim();
+            const isHardcodedTestUser = ['creatorfull@frameup.com', 'editorfull@frameup.com'].includes(userEmail);
+
+            if (userData?.is_test_account || isHardcodedTestUser) {
+                setIsTestAccount(true);
+                setProject(projectData);
+                setLoading(false);
                 return;
             }
 
@@ -100,9 +149,9 @@ export default function Payment() {
         );
     }
 
-    if (!project || !clientSecret) return null;
+    if (!project || (!clientSecret && !isTestAccount)) return null;
 
-    const options = {
+    const options = clientSecret ? {
         clientSecret,
         appearance: {
             theme: 'stripe' as const,
@@ -110,7 +159,7 @@ export default function Payment() {
                 colorPrimary: '#2563EB',
             }
         }
-    };
+    } : undefined;
 
     return (
         <DashboardLayout
@@ -127,12 +176,34 @@ export default function Payment() {
                                 Informações de Pagamento
                             </h2>
 
-                            <Elements stripe={stripePromise} options={options}>
-                                <CheckoutForm
-                                    projectId={project.id}
-                                    amount={project.total_paid_by_creator}
-                                />
-                            </Elements>
+                            {isTestAccount ? (
+                                <div className="space-y-4">
+                                    <div className="bg-amber-100 border border-amber-200 text-amber-800 p-4 rounded-lg flex items-center gap-3">
+                                        <span className="text-2xl">🧪</span>
+                                        <div>
+                                            <h3 className="font-bold">Modo de Teste Ativo</h3>
+                                            <p className="text-sm">Você pode publicar este projeto sem realizar pagamento real.</p>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        className="w-full"
+                                        size="lg"
+                                        onClick={handleTestPayment}
+                                        disabled={loading}
+                                    >
+                                        {loading ? 'Processando...' : 'Confirmar Publicação (Bypass)'}
+                                    </Button>
+                                </div>
+                            ) : (
+                                options && (
+                                    <Elements stripe={stripePromise} options={options}>
+                                        <CheckoutForm
+                                            projectId={project.id}
+                                            amount={project.total_paid_by_creator}
+                                        />
+                                    </Elements>
+                                )
+                            )}
                         </Card>
                     </div>
 

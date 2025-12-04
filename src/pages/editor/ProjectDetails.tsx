@@ -33,7 +33,7 @@ interface Project {
     description: string;
     video_type: string;
     editing_style: string;
-    duration: string;
+    duration_category: string;
     base_price: number;
     deadline_days: number;
     reference_files_url?: string;
@@ -265,7 +265,7 @@ function ProjectDetails() {
                             <div className="flex items-center gap-3">
                                 <Avatar className="w-10 h-10">
                                     <AvatarImage src={project.users.profile_photo_url} alt={project.users.full_name} />
-                                    <AvatarFallback>{project.users.full_name.charAt(0).toUpperCase()}</AvatarFallback>
+                                    <AvatarFallback>{project.users?.full_name?.charAt(0)?.toUpperCase() || '?'}</AvatarFallback>
                                 </Avatar>
                                 <div>
                                     <p className="font-medium text-foreground">
@@ -303,7 +303,7 @@ function ProjectDetails() {
                                 <div className="flex items-center gap-1.5">
                                     <Clock className="w-4 h-4 text-primary" />
                                     <p className="font-medium text-foreground text-sm">
-                                        {durationLabels[project.duration] || project.duration}
+                                        {durationLabels[project.duration_category] || project.duration_category}
                                     </p>
                                 </div>
                             </div>

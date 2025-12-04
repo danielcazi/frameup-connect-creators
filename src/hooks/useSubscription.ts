@@ -24,7 +24,36 @@ export function useSubscription() {
     const loadSubscription = useCallback(async () => {
         if (!user) return;
 
+        console.log('useSubscription: Checking user', { id: user.id, email: user.email });
+
         try {
+            // Check for bypass first
+            const { data: profile } = await supabase
+                .from('editor_profiles')
+                .select('bypass_subscription')
+                .eq('user_id', user.id)
+                .single();
+
+            const userEmail = (user.email || user.user_metadata?.email || '').toLowerCase().trim();
+
+            if (profile?.bypass_subscription || userEmail === 'editorfull@frameup.com') {
+                setSubscription({
+                    id: 'test-subscription',
+                    status: 'active',
+                    plan_id: 'test-plan',
+                    current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                    cancel_at_period_end: false,
+                    subscription_plans: {
+                        name: 'pro',
+                        display_name: '🧪 Teste (Bypass)',
+                        max_simultaneous_projects: 999,
+                        has_highlight_badge: true,
+                    }
+                });
+                setLoading(false);
+                return;
+            }
+
             const { data, error } = await supabase
                 .from('editor_subscriptions')
                 .select(`

@@ -133,7 +133,7 @@ function ProjectCard({ project, hasApplied, canApply, onApply, showStatus }: Pro
                 <div className="flex items-center gap-2">
                     <Avatar className="w-8 h-8">
                         <AvatarImage src={project.users.profile_photo_url} alt={project.users.full_name} />
-                        <AvatarFallback>{project.users.full_name.charAt(0).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback>{project.users?.full_name?.charAt(0)?.toUpperCase() || '?'}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">

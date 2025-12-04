@@ -1,7 +1,7 @@
 # 🏗️ FRAMEUP - PROJECT STATE
 
 ## 📊 STATUS GERAL
-**Fase Atual:** 25.7 - Integrações e Rotas
+**Fase Atual:** 25.9 - Correções Críticas (Profiles & Payments)
 **Progresso Geral:** 98%
 **Próxima Fase:** 26.0 - Testes Finais e Deploy
 
@@ -47,6 +47,12 @@
 - [x] 25.6 - Página de Propostas do Editor
 - [x] 25.7 - Rotas e Sidebar
 - [x] 25.8 - Correção de visualização de perfil de editor
+- [x] 25.9 - Correções Críticas (Profiles & Payments)
+  - [x] Fix RLS em EditProfile (Update vs Insert)
+  - [x] Fix tabela creator_profiles inexistente
+  - [x] Fix coluna published_at em projects
+  - [x] Bypass de Pagamento para contas de teste
+  - [x] Bypass de Assinatura para editorfull
 
 ---
 
@@ -105,6 +111,7 @@ src/
 | `users` | Usuários (auth.users extension) | Supabase default |
 | `profiles` | Perfis de usuário | - |
 | `editor_profiles` | Dados específicos editor | - |
+| `creator_profiles` | Dados específicos creator | ✅ Criada (fix_missing_table) |
 | `portfolio_videos` | Vídeos do portfólio | - |
 | `projects` | Projetos de edição | - |
 | `project_applications` | Candidaturas | - |

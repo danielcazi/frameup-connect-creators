@@ -41,6 +41,7 @@ export async function saveProjectDraft(projectData: ProjectData, creatorId: stri
                 platform_fee_percentage: 5,
                 platform_fee: projectData.platform_fee,
                 total_paid_by_creator: projectData.total_paid_by_creator,
+                total_price: projectData.total_paid_by_creator, // Map to legacy total_price column
                 editor_receives: projectData.base_price, // Assuming editor receives base price for now
 
                 // Configurações
@@ -49,6 +50,7 @@ export async function saveProjectDraft(projectData: ProjectData, creatorId: stri
                 max_revisions: 3,
                 current_revisions: 0,
                 estimated_delivery_days: projectData.estimated_delivery_days,
+                deadline_days: projectData.estimated_delivery_days, // Map to legacy deadline_days column
 
                 // Status
                 status: 'draft',

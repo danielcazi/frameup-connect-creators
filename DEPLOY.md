@@ -27,7 +27,7 @@ Adicione os seguintes secrets:
 - `VITE_STRIPE_PUBLISHABLE_KEY`: Chave pública do Stripe
 - `VITE_STRIPE_BASIC_PRICE_ID`: ID do plano básico no Stripe
 - `VITE_STRIPE_PRO_PRICE_ID`: ID do plano pro no Stripe
-- `VITE_APP_URL`: URL da aplicação (ex: `https://seu-usuario.github.io/frameup-connect-creators`)
+- `VITE_APP_URL`: URL da aplicação (ex: `https://github.com/danielcazi/frameup-connect-creators`)
 
 #### 2. Habilitar GitHub Pages
 
@@ -42,7 +42,7 @@ Adicione os seguintes secrets:
 git init
 
 # Adicionar remote
-git remote add origin https://github.com/seu-usuario/frameup-connect-creators.git
+git remote add origin https://github.com/danielcazi/frameup-connect-creators.git
 
 # Adicionar arquivos
 git add .
@@ -59,7 +59,7 @@ git push -u origin main
 1. Vá para a aba **Actions** no seu repositório
 2. Você verá o workflow "Deploy to GitHub Pages" rodando
 3. Aguarde a conclusão (geralmente 2-3 minutos)
-4. Acesse: `https://seu-usuario.github.io/frameup-connect-creators`
+4. Acesse: `https://github.com/danielcazi/frameup-connect-creators`
 
 ### 🔄 Deploys Automáticos
 

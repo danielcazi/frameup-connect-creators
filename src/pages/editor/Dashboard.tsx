@@ -9,6 +9,8 @@ import ProjectCard from '@/components/editor/ProjectCard';
 import ProjectFilters from '@/components/editor/ProjectFilters';
 import EmptyState from '@/components/ui/EmptyState';
 import { MarketplaceLoadingSkeleton } from '@/components/ui/LoadingSkeleton';
+import { useToast } from '@/hooks/use-toast';
+import { useDebounce } from '@/hooks/useDebounce';
 import { Search, Filter, Briefcase, AlertCircle, Star, DollarSign, CheckCircle, MessageSquare, Clock } from 'lucide-react';
 import { getEditorFavoriteCount } from '@/services/favoritesService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,11 +51,14 @@ interface Filters {
 function EditorDashboard() {
   const { user } = useAuth();
   const { subscription } = useSubscription();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+
+  console.log('EditorDashboard rendering', { user, subscription, loading });
   const [showFilters, setShowFilters] = useState(false);
   const [currentProjectsCount, setCurrentProjectsCount] = useState(0);
   const [myApplications, setMyApplications] = useState<Set<string>>(new Set());
@@ -73,6 +78,8 @@ function EditorDashboard() {
     maxDeadline: 30,
     search: '',
   });
+
+  const debouncedSearch = useDebounce(filters.search, 500);
 
   useEffect(() => {
     loadProjects();
@@ -104,7 +111,7 @@ function EditorDashboard() {
 
   useEffect(() => {
     applyFilters();
-  }, [filters, projects]);
+  }, [filters, projects, debouncedSearch]);
 
   async function loadDashboardData() {
     if (!user) return;
@@ -158,6 +165,11 @@ function EditorDashboard() {
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      toast({
+        title: "Erro ao carregar dados",
+        description: "Não foi possível carregar os dados do dashboard. Tente novamente.",
+        variant: "destructive"
+      });
     }
   }
 
@@ -173,11 +185,11 @@ function EditorDashboard() {
           description,
           video_type,
           editing_style,
-          duration,
+          duration_category,
           base_price,
           deadline_days,
           created_at,
-          users:creator_id (
+          users:users!projects_creator_id_fkey (
             full_name,
             username,
             profile_photo_url
@@ -251,8 +263,8 @@ function EditorDashboard() {
   function applyFilters() {
     let filtered = [...projects];
 
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
+    if (debouncedSearch) {
+      const searchLower = debouncedSearch.toLowerCase();
       filtered = filtered.filter(
         p =>
           p.title.toLowerCase().includes(searchLower) ||
@@ -448,6 +460,7 @@ function EditorDashboard() {
                       value={filters.search}
                       onChange={(e) => handleFilterChange({ search: e.target.value })}
                       className="w-full pl-10 pr-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary bg-background"
+                      aria-label="Buscar projetos"
                     />
                   </div>
                   <button

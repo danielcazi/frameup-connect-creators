@@ -18,6 +18,7 @@ import {
     Loader2,
     Edit,
     MessageSquare,
+    RefreshCw,
 } from 'lucide-react';
 import FavoriteButton from '@/components/favorites/FavoriteButton';
 
@@ -54,6 +55,7 @@ function EditorPublicProfile() {
     const [profile, setProfile] = useState<EditorProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeVideoIndex, setActiveVideoIndex] = useState(0);
+    const [hasWorkedTogether, setHasWorkedTogether] = useState(false);
 
     const isOwnProfile = user && profile && user.id === profile.user_id;
 
@@ -129,6 +131,18 @@ function EditorPublicProfile() {
             }
 
             setProfile(transformedProfile);
+
+            // Check if worked together (if user is creator)
+            if (user && userType === 'creator') {
+                const { count } = await supabase
+                    .from('projects')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('creator_id', user.id)
+                    .eq('assigned_editor_id', data.id)
+                    .eq('status', 'completed');
+
+                setHasWorkedTogether((count || 0) > 0);
+            }
         } catch (error) {
             console.error('Error loading profile:', error);
         } finally {
@@ -258,7 +272,19 @@ function EditorPublicProfile() {
                                     </Button>
                                 ) : userType === 'creator' && (
                                     <div className="flex items-center gap-3">
+                                        {hasWorkedTogether && (
+                                            <Button
+                                                onClick={() => navigate('/creator/project/new', {
+                                                    state: { rehireEditorId: profile.user_id }
+                                                })}
+                                                className="bg-green-600 hover:bg-green-700 text-white"
+                                            >
+                                                <RefreshCw className="w-4 h-4 mr-2" />
+                                                Recontratar
+                                            </Button>
+                                        )}
                                         <Button
+                                            variant="outline"
                                             onClick={() => navigate('/creator/dashboard')}
                                         >
                                             <MessageSquare className="w-4 h-4 mr-2" />

@@ -29,7 +29,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 const Login = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { signIn, user } = useAuth();
+  const { signIn, user, userType } = useAuth(); // Get userType from context
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -46,22 +46,32 @@ const Login = () => {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user) {
-      const userType = user.user_metadata?.user_type;
+    if (user && userType) {
       if (userType === 'creator') {
         navigate('/creator/dashboard');
       } else if (userType === 'editor') {
         navigate('/editor/dashboard');
       }
     }
-  }, [user, navigate]);
+  }, [user, userType, navigate]);
 
   const onSubmit = async (data: LoginFormData) => {
     console.log('Form submitted', data);
     setIsLoading(true);
 
     try {
-      const { error, userType } = await signIn(data.email, data.password);
+      // Create a timeout promise that rejects after 20 seconds
+      const timeoutPromise = new Promise<{ error: any; userType?: any }>((_, reject) => {
+        setTimeout(() => reject(new Error('Tempo limite de conexão excedido')), 20000);
+      });
+
+      // Race the signIn call against the timeout
+      const result = await Promise.race([
+        signIn(data.email, data.password),
+        timeoutPromise
+      ]);
+
+      const { error, userType } = result;
 
       if (error) {
         // Handle specific error messages
@@ -75,6 +85,8 @@ const Login = () => {
           errorMessage = 'Por favor, confirme seu email antes de fazer login';
         } else if (error.message.includes('User not found')) {
           errorMessage = 'Usuário não encontrado';
+        } else if (error.message.includes('Tempo limite')) {
+          errorMessage = 'O servidor demorou muito para responder. Verifique sua conexão.';
         }
 
         toast({
@@ -97,14 +109,18 @@ const Login = () => {
       } else if (userType === 'editor') {
         navigate('/editor/dashboard');
       } else {
-        navigate('/');
+        toast({
+          variant: 'destructive',
+          title: 'Erro de Perfil',
+          description: 'Não foi possível identificar seu tipo de conta. Por favor, entre em contato com o suporte.',
+        });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
       toast({
         variant: 'destructive',
         title: 'Erro inesperado',
-        description: 'Ocorreu um erro. Por favor, tente novamente.',
+        description: error.message || 'Ocorreu um erro. Por favor, tente novamente.',
       });
     } finally {
       setIsLoading(false);

@@ -72,6 +72,7 @@ function EditProfile() {
     const [state, setState] = useState('');
     const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
     const [selectedSoftwares, setSelectedSoftwares] = useState<string[]>([]);
+    const [profileId, setProfileId] = useState<string | null>(null);
 
     useEffect(() => {
         if (user) {
@@ -105,6 +106,7 @@ function EditProfile() {
             setProfilePhoto(userData.profile_photo_url || '');
 
             if (editorData) {
+                setProfileId(editorData.id);
                 setBio(editorData.bio || '');
                 setCity(editorData.city || '');
                 setState(editorData.state || '');
@@ -197,10 +199,19 @@ function EditProfile() {
             return;
         }
 
+        if (!user) {
+            toast({
+                variant: 'destructive',
+                title: 'Erro',
+                description: 'Usuário não autenticado',
+            });
+            return;
+        }
+
         setSaving(true);
 
         try {
-            // Atualizar users table
+            // 1. Atualizar users table
             const { error: userError } = await supabase
                 .from('users')
                 .update({
@@ -208,7 +219,7 @@ function EditProfile() {
                     username: username.trim().toLowerCase(),
                     profile_photo_url: profilePhoto || null,
                 })
-                .eq('id', user?.id);
+                .eq('id', user.id);
 
             if (userError) {
                 if (userError.code === '23505') {
@@ -217,17 +228,50 @@ function EditProfile() {
                 throw userError;
             }
 
-            // Upsert editor_profiles
-            const { error: profileError } = await supabase
-                .from('editor_profiles')
-                .upsert({
-                    user_id: user?.id,
-                    bio: bio.trim(),
-                    city: city.trim(),
-                    state: state.trim(),
-                    specialties: selectedSpecialties,
-                    software_skills: selectedSoftwares,
-                });
+            // 2. Atualizar ou Criar editor_profiles
+            const commonData = {
+                bio: bio.trim(),
+                city: city.trim(),
+                state: state.trim(),
+                specialties: selectedSpecialties,
+                software_skills: selectedSoftwares,
+            };
+
+            let profileError;
+
+            // Se já carregamos um perfil anteriormente, ou se o usuário já tem um ID de perfil
+            if (profileId) {
+                // UPDATE: Usar user_id como filtro é mais seguro para RLS
+                const { error } = await supabase
+                    .from('editor_profiles')
+                    .update(commonData)
+                    .eq('user_id', user.id);
+
+                profileError = error;
+            } else {
+                // Tentar UPDATE primeiro (caso o profileId tenha se perdido mas o perfil exista)
+                const { data: updated, error: updateError } = await supabase
+                    .from('editor_profiles')
+                    .update(commonData)
+                    .eq('user_id', user.id)
+                    .select();
+
+                if (updateError) {
+                    profileError = updateError;
+                } else if (updated && updated.length > 0) {
+                    // Update funcionou
+                    profileError = null;
+                } else {
+                    // Se update não afetou nenhuma linha, tentar INSERT
+                    const { error: insertError } = await supabase
+                        .from('editor_profiles')
+                        .insert({
+                            user_id: user.id,
+                            ...commonData
+                        });
+                    profileError = insertError;
+                }
+            }
 
             if (profileError) throw profileError;
 
@@ -242,6 +286,10 @@ function EditProfile() {
                 username: username.trim().toLowerCase(),
                 profile_photo_url: profilePhoto || null,
             });
+
+            // Recarregar perfil para garantir estado atualizado
+            loadProfile();
+
         } catch (error: any) {
             console.error('Error saving profile:', error);
             toast({
