@@ -16,22 +16,30 @@ import {
     Crown,
     Loader2,
     ExternalLink,
-    TrendingUp
+    TrendingUp,
+    Zap,
+    Award
 } from 'lucide-react';
+import SubscriptionPlansInline from '@/components/subscription/SubscriptionPlansInline';
+import { PlansSection } from '@/components/subscription/PlansSection';
 
 interface Subscription {
     id: string;
+    user_id: string;
+    plan_id: string;
     status: 'active' | 'past_due' | 'cancelled' | 'expired';
     stripe_subscription_id: string;
     stripe_customer_id: string;
     current_period_start: string;
     current_period_end: string;
     cancel_at_period_end: boolean;
+    created_at: string;
+    updated_at: string;
     subscription_plans: {
         id: string;
         name: string;
         display_name: string;
-        price: number;
+        price_monthly: number;
         max_simultaneous_projects: number;
         has_highlight_badge: boolean;
         features: string[];
@@ -58,41 +66,15 @@ function ManageSubscription() {
         if (!user) return;
         try {
             const { data, error } = await supabase
-                .from('editor_subscriptions')
+                .from('user_subscriptions')
                 .select(`
-          *,
-          subscription_plans (*)
-        `)
-                .eq('editor_id', user.id)
+                    *,
+                    subscription_plans (*)
+                `)
+                .eq('user_id', user.id)
                 .order('created_at', { ascending: false })
                 .limit(1)
-                .limit(1)
-                .single();
-
-            const userEmail = (user.email || user.user_metadata?.email || '').toLowerCase().trim();
-            if (userEmail === 'editorfull@frameup.com') {
-                // @ts-ignore
-                setSubscription({
-                    id: 'test-subscription',
-                    status: 'active',
-                    stripe_subscription_id: 'sub_test',
-                    stripe_customer_id: 'cus_test',
-                    current_period_start: new Date().toISOString(),
-                    current_period_end: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
-                    cancel_at_period_end: false,
-                    subscription_plans: {
-                        id: 'pro-plan-id',
-                        name: 'pro',
-                        display_name: 'Plano Pro',
-                        price: 97.00,
-                        max_simultaneous_projects: 4,
-                        has_highlight_badge: true,
-                        features: ['Acesso a projetos ilimitados', '4 projetos simultâneos', 'Taxa de plataforma mínima (10%)', 'Suporte prioritário', 'Badge de Editor PRO', 'Acesso antecipado a novos projetos']
-                    }
-                });
-                setLoading(false);
-                return;
-            }
+                .maybeSingle();
 
             if (error && error.code !== 'PGRST116') throw error;
 
@@ -251,23 +233,25 @@ function ManageSubscription() {
             <DashboardLayout
                 userType="editor"
                 title="Gerenciar Assinatura"
-                subtitle="Você não possui assinatura ativa"
+                subtitle="Escolha o plano ideal para você"
             >
-                <Card className="text-center p-8">
-                    <AlertCircle className="w-12 h-12 text-yellow-600 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-foreground mb-2">
-                        Nenhuma Assinatura Ativa
-                    </h3>
-                    <p className="text-muted-foreground mb-6">
-                        Assine um plano para começar a acessar projetos.
-                    </p>
-                    <Button
-                        size="lg"
-                        onClick={() => navigate('/editor/subscription/plans')}
-                    >
-                        Ver Planos Disponíveis
-                    </Button>
-                </Card>
+                <div className="max-w-6xl mx-auto space-y-8">
+                    {/* Header informativo */}
+                    <div className="text-center">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                            <Crown className="w-8 h-8 text-primary" />
+                        </div>
+                        <h2 className="text-2xl font-bold text-foreground mb-2">
+                            Você ainda não possui uma assinatura
+                        </h2>
+                        <p className="text-muted-foreground max-w-md mx-auto">
+                            Assine um plano para começar a se candidatar a projetos e aumentar sua renda como editor.
+                        </p>
+                    </div>
+
+                    {/* Planos - Renderizados inline */}
+                    <SubscriptionPlansInline />
+                </div>
             </DashboardLayout>
         );
     }
@@ -287,7 +271,7 @@ function ManageSubscription() {
                                 {subscription.subscription_plans.display_name}
                             </h2>
                             <p className="text-muted-foreground">
-                                R$ {Number(subscription.subscription_plans.price).toFixed(2).replace('.', ',')}/mês
+                                R$ {Number(subscription.subscription_plans.price_monthly).toFixed(2).replace('.', ',')}/mês
                             </p>
                         </div>
                         {getStatusBadge(subscription.status)}

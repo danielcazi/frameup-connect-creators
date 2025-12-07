@@ -16,6 +16,7 @@ import { RefreshCw, User, Star, X } from 'lucide-react';
 import { useWorkedEditors } from '@/hooks/useRehire';
 import { createRehireProject, WorkedEditor, formatProjectsCount } from '@/services/rehireService';
 import EditorSelectorModal from '@/components/rehire/EditorSelectorModal';
+import { isDemoUser, publishProjectAsDemo } from '@/lib/demo';
 
 type VideoType = 'reels' | 'motion' | 'youtube';
 type EditingStyle = 'lofi' | 'dynamic' | 'pro' | 'motion';
@@ -186,15 +187,33 @@ export default function NewProject() {
           throw new Error(result.error);
         }
 
-        // 2. Redirecionar para página de pagamento
-        toast({
-          title: 'Projeto salvo!',
-          description: 'Redirecionando para revisão e pagamento...',
-        });
+        // 2. Verificar se é usuário demo (bypass de pagamento)
+        const isDemo = await isDemoUser(user.id);
 
-        setTimeout(() => {
-          navigate(`/creator/project/${result.project.id}/payment`);
-        }, 1500);
+        if (isDemo) {
+          // Demo user: publicar projeto diretamente sem pagamento
+          const published = await publishProjectAsDemo(result.project.id);
+
+          if (published) {
+            toast({
+              title: '🎉 Projeto publicado!',
+              description: 'Modo demo: projeto publicado sem pagamento.',
+            });
+            navigate('/creator/dashboard');
+          } else {
+            throw new Error('Erro ao publicar projeto no modo demo');
+          }
+        } else {
+          // Usuário normal: redirecionar para página de pagamento Stripe
+          toast({
+            title: 'Projeto salvo!',
+            description: 'Redirecionando para revisão e pagamento...',
+          });
+
+          setTimeout(() => {
+            navigate(`/creator/project/${result.project.id}/payment`);
+          }, 1500);
+        }
       }
 
     } catch (error: any) {

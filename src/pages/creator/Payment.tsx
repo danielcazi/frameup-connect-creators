@@ -26,14 +26,9 @@ export default function Payment() {
     const handleTestPayment = async () => {
         setLoading(true);
         try {
-            const { error } = await supabase
-                .from('projects')
-                .update({
-                    status: 'open',
-                    payment_status: 'paid',
-                    published_at: new Date().toISOString()
-                })
-                .eq('id', project.id);
+            const { error } = await supabase.rpc('publish_demo_project', {
+                p_project_id: project.id
+            });
 
             if (error) throw error;
 

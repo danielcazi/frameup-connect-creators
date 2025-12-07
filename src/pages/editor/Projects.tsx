@@ -101,11 +101,7 @@ const EditorProjects = () => {
           deadline_days,
           created_at,
           status,
-          users:users!projects_creator_id_fkey (
-            full_name,
-            username,
-            profile_photo_url
-          )
+          creator_id
         `)
                 .eq('status', 'open')
                 .order('created_at', { ascending: false });
@@ -128,9 +124,25 @@ const EditorProjects = () => {
                 }, {} as Record<string, number>) || {};
             }
 
+            // Manual fetch for creator details
+            const creatorIds = Array.from(new Set(data.map(p => p.creator_id).filter(Boolean)));
+            let creatorsMap: Record<string, any> = {};
+
+            if (creatorIds.length > 0) {
+                const { data: creatorsData } = await supabase
+                    .from('users')
+                    .select('id, full_name, username, profile_photo_url')
+                    .in('id', creatorIds);
+
+                if (creatorsData) {
+                    creatorsMap = creatorsData.reduce((acc, c) => ({ ...acc, [c.id]: c }), {});
+                }
+            }
+
             // @ts-ignore
             const projectsWithCounts = data.map(project => ({
                 ...project,
+                users: creatorsMap[project.creator_id] || { full_name: 'Desconhecido', username: 'unknown' },
                 _count: {
                     applications: applicationCounts[project.id] || 0
                 }

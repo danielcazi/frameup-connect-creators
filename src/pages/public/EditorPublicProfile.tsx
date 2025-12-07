@@ -1,3 +1,4 @@
+import PortfolioDisplay from '@/components/profile/PortfolioDisplay';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -54,7 +55,6 @@ function EditorPublicProfile() {
 
     const [profile, setProfile] = useState<EditorProfile | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeVideoIndex, setActiveVideoIndex] = useState(0);
     const [hasWorkedTogether, setHasWorkedTogether] = useState(false);
 
     const isOwnProfile = user && profile && user.id === profile.user_id;
@@ -150,31 +150,7 @@ function EditorPublicProfile() {
         }
     }
 
-    function getVideoEmbedUrl(url: string): string {
-        try {
-            // YouTube
-            if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                let videoId = '';
-                if (url.includes('youtu.be')) {
-                    videoId = url.split('youtu.be/')[1]?.split('?')[0];
-                } else {
-                    const urlObj = new URL(url);
-                    videoId = urlObj.searchParams.get('v') || '';
-                }
-                return `https://www.youtube.com/embed/${videoId}`;
-            }
 
-            // Vimeo
-            if (url.includes('vimeo.com')) {
-                const videoId = url.split('vimeo.com/')[1]?.split('?')[0];
-                return `https://player.vimeo.com/video/${videoId}`;
-            }
-        } catch (e) {
-            console.error('Error parsing video URL', e);
-        }
-
-        return url;
-    }
 
     if (loading) {
         return (
@@ -361,72 +337,7 @@ function EditorPublicProfile() {
                                 <Play className="w-5 h-5" />
                                 Portfólio ({profile.portfolio_videos.length})
                             </h3>
-
-                            <div className="space-y-4">
-                                {/* Main Video Player */}
-                                <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                                    <iframe
-                                        src={getVideoEmbedUrl(profile.portfolio_videos[activeVideoIndex].video_url)}
-                                        title={profile.portfolio_videos[activeVideoIndex].title}
-                                        className="w-full h-full"
-                                        allowFullScreen
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    />
-                                </div>
-
-                                {/* Video Info */}
-                                <div className="bg-muted/50 rounded-lg p-4">
-                                    <div className="flex items-start justify-between gap-4 mb-2">
-                                        <div className="flex-1">
-                                            <h4 className="font-semibold text-foreground mb-1">
-                                                {profile.portfolio_videos[activeVideoIndex].title}
-                                            </h4>
-                                            {profile.portfolio_videos[activeVideoIndex].description && (
-                                                <p className="text-sm text-muted-foreground">
-                                                    {profile.portfolio_videos[activeVideoIndex].description}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <Badge variant="outline">
-                                            {profile.portfolio_videos[activeVideoIndex].video_type}
-                                        </Badge>
-                                    </div>
-
-                                    <a
-                                        href={profile.portfolio_videos[activeVideoIndex].video_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-sm text-primary hover:underline font-medium flex items-center gap-1"
-                                    >
-                                        Assistir no site original
-                                        <ExternalLink className="w-4 h-4" />
-                                    </a>
-                                </div>
-
-                                {/* Video Thumbnails */}
-                                {profile.portfolio_videos.length > 1 && (
-                                    <div className="grid grid-cols-3 gap-3">
-                                        {profile.portfolio_videos.map((video, index) => (
-                                            <button
-                                                key={video.id}
-                                                onClick={() => setActiveVideoIndex(index)}
-                                                className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${index === activeVideoIndex
-                                                    ? 'border-primary shadow-md'
-                                                    : 'border-transparent hover:border-muted-foreground/50'
-                                                    }`}
-                                            >
-                                                <div className="absolute inset-0 bg-black/20" />
-                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                    <Play className="w-8 h-8 text-white opacity-80" />
-                                                </div>
-                                                <span className="absolute bottom-1 left-2 text-[10px] font-medium text-white bg-black/50 px-1 rounded">
-                                                    Vídeo {video.order_position}
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                            <PortfolioDisplay videos={profile.portfolio_videos} />
                         </CardContent>
                     </Card>
                 )}

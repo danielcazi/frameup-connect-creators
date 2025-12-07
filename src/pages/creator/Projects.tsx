@@ -61,14 +61,7 @@ const CreatorProjects = () => {
         try {
             let query = supabase
                 .from('projects')
-                .select(`
-          *,
-          assigned_editor:users!assigned_editor_id(
-            full_name,
-            username,
-            profile_photo_url
-          )
-        `)
+                .select('*')
                 .eq('creator_id', user.id);
 
             // Apply status filter
@@ -87,6 +80,25 @@ const CreatorProjects = () => {
             const { data, error } = await query;
 
             if (error) throw error;
+
+            // Collect assigned editor IDs
+            const editorIds = Array.from(new Set(data?.map(p => p.assigned_editor_id).filter(Boolean) || []));
+
+            // Fetch editor profiles separately
+            let editorsMap: Record<string, any> = {};
+            if (editorIds.length > 0) {
+                const { data: editorsData } = await supabase
+                    .from('users')
+                    .select('id, full_name, username, profile_photo_url')
+                    .in('id', editorIds);
+
+                if (editorsData) {
+                    editorsMap = editorsData.reduce((acc, editor) => {
+                        acc[editor.id] = editor;
+                        return acc;
+                    }, {} as Record<string, any>);
+                }
+            }
 
             // Load application counts for each project
             const projectIds = data?.map(p => p.id) || [];
@@ -112,13 +124,14 @@ const CreatorProjects = () => {
 
             const reviewedProjectIds = new Set(reviewsData?.map(r => r.project_id));
 
-            // Transform projects to include _count and has_reviewed
+            // Transform projects to include _count, has_reviewed, and assigned_editor
             const projectsWithCounts = data?.map(project => ({
                 ...project,
                 _count: {
                     applications: applicationCounts[project.id] || 0
                 },
-                has_reviewed: reviewedProjectIds.has(project.id)
+                has_reviewed: reviewedProjectIds.has(project.id),
+                assigned_editor: project.assigned_editor_id ? editorsMap[project.assigned_editor_id] : null
             })) || [];
 
             setProjects(projectsWithCounts);

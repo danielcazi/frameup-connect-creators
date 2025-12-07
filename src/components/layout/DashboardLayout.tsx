@@ -32,7 +32,7 @@ import { TestModeBanner } from '@/components/TestModeBanner';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
-  userType: 'creator' | 'editor';
+  userType: 'creator' | 'editor' | 'admin';
   title?: string;
   subtitle?: string;
   headerAction?: React.ReactNode;

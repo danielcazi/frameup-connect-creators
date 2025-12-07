@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ProjectDetailsLoadingSkeleton } from '@/components/ui/LoadingSkeleton';
+import { getProjectDeliveries } from '@/services/deliveryService';
+import type { ProjectDelivery } from '@/types/delivery';
+import { canEditProject, getProjectStatusLabel } from '@/lib/projects';
 import {
     Calendar,
     DollarSign,
@@ -20,6 +23,13 @@ import {
     ExternalLink,
     ArrowLeft,
     Edit,
+    History,
+    Play,
+    CheckCircle,
+    AlertCircle,
+    Eye,
+    CheckCircle2,
+    Lock,
 } from 'lucide-react';
 
 interface Project {
@@ -36,6 +46,7 @@ interface Project {
     context_description?: string;
     created_at: string;
     status: string;
+    assigned_editor_id?: string;
     _count?: {
         applications: number;
     };
@@ -50,6 +61,8 @@ function CreatorProjectDetails() {
     const [project, setProject] = useState<Project | null>(null);
     const [loading, setLoading] = useState(true);
     const [applicationCount, setApplicationCount] = useState(0);
+    const [deliveries, setDeliveries] = useState<ProjectDelivery[]>([]);
+    const [latestDelivery, setLatestDelivery] = useState<ProjectDelivery | null>(null);
 
     useEffect(() => {
         if (id && user) {
@@ -61,6 +74,14 @@ function CreatorProjectDetails() {
     async function loadProject() {
         try {
             setLoading(true);
+
+            // Carregar entregas
+            const projectDeliveries = await getProjectDeliveries(id!);
+            setDeliveries(projectDeliveries);
+
+            if (projectDeliveries.length > 0) {
+                setLatestDelivery(projectDeliveries[0]);
+            }
 
             const { data, error } = await supabase
                 .from('projects')
@@ -119,23 +140,19 @@ function CreatorProjectDetails() {
         '5m': '5+ minutos',
     };
 
-    function getStatusBadge(status: string) {
-        switch (status) {
-            case 'draft':
-                return <Badge variant="secondary">Rascunho</Badge>;
-            case 'open':
-                return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">Aberto</Badge>;
-            case 'in_progress':
-                return <Badge variant="default">Em Andamento</Badge>;
-            case 'in_review':
-                return <Badge className="bg-blue-500 hover:bg-blue-600 text-white">Em Revisão</Badge>;
-            case 'completed':
-                return <Badge className="bg-green-500 hover:bg-green-600 text-white">Concluído</Badge>;
-            case 'cancelled':
-                return <Badge variant="destructive">Cancelado</Badge>;
-            default:
-                return <Badge variant="secondary">{status}</Badge>;
-        }
+    function getStatusBadge(project: Project) {
+        const statusLabel = getProjectStatusLabel(project);
+        const status = project.status;
+        const hasEditor = !!project.assigned_editor_id;
+
+        if (status === 'draft') return <Badge variant="secondary">{statusLabel}</Badge>;
+        if (status === 'open' || (status === 'published' && !hasEditor)) return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">{statusLabel}</Badge>;
+        if (status === 'in_progress' || (status === 'published' && hasEditor)) return <Badge variant="default">{statusLabel}</Badge>;
+        if (status === 'in_review') return <Badge className="bg-blue-500 hover:bg-blue-600 text-white">{statusLabel}</Badge>;
+        if (status === 'completed') return <Badge className="bg-green-500 hover:bg-green-600 text-white">{statusLabel}</Badge>;
+        if (status === 'cancelled') return <Badge variant="destructive">{statusLabel}</Badge>;
+
+        return <Badge variant="secondary">{statusLabel}</Badge>;
     }
 
     if (loading) {
@@ -181,8 +198,8 @@ function CreatorProjectDetails() {
                                 Ver Candidaturas ({applicationCount})
                             </Button>
                         )}
-                        {/* Only allow edit if draft or open with no applications (simplified rule) */}
-                        {(project.status === 'draft' || (project.status === 'open' && applicationCount === 0)) && (
+                        {/* Edit Button Logic */}
+                        {canEditProject(project) ? (
                             <Button
                                 variant="outline"
                                 onClick={() => navigate(`/creator/project/${project.id}/edit`)}
@@ -190,7 +207,12 @@ function CreatorProjectDetails() {
                                 <Edit className="w-4 h-4 mr-2" />
                                 Editar
                             </Button>
-                        )}
+                        ) : project?.assigned_editor_id ? (
+                            <Button variant="outline" disabled title="Não é possível editar após aceitar um editor">
+                                <Lock className="w-4 h-4 mr-2" />
+                                Bloqueado
+                            </Button>
+                        ) : null}
                     </div>
                 </div>
 
@@ -207,7 +229,7 @@ function CreatorProjectDetails() {
                                 <span>Criado em {new Date(project.created_at).toLocaleDateString('pt-BR')}</span>
                             </div>
                         </div>
-                        {getStatusBadge(project.status)}
+                        {getStatusBadge(project)}
                     </div>
 
                     {/* Quick Info */}
@@ -329,6 +351,169 @@ function CreatorProjectDetails() {
                         </div>
                     </div>
                 </Card>
+
+                {/* Seção de Revisão - Só aparece quando há entrega pendente */}
+                {latestDelivery && latestDelivery.status === 'pending_review' && (
+                    <Card className="p-6 mt-6 border-primary/50 bg-primary/5">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-primary/10 rounded-full">
+                                    <Play className="h-6 w-6 text-primary" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-lg">Vídeo Aguardando Revisão</h3>
+                                    <p className="text-muted-foreground">
+                                        O editor enviou a versão {latestDelivery.version} para sua aprovação
+                                    </p>
+                                </div>
+                            </div>
+                            <Button onClick={() => navigate(`/creator/project/${id}/review`)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                Revisar Vídeo
+                            </Button>
+                        </div>
+                    </Card>
+                )}
+
+                {/* Seção de Status quando já foi revisado */}
+                {latestDelivery && latestDelivery.status === 'approved' && (
+                    <Card className="p-6 mt-6 border-green-500/50 bg-green-50 dark:bg-green-950/20">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-green-100 dark:bg-green-900 rounded-full">
+                                <CheckCircle className="h-6 w-6 text-green-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-lg text-green-700 dark:text-green-400">
+                                    Projeto Concluído
+                                </h3>
+                                <p className="text-green-600 dark:text-green-500">
+                                    Você aprovou a versão {latestDelivery.version} em{' '}
+                                    {new Date(latestDelivery.updated_at).toLocaleDateString('pt-BR')}
+                                </p>
+                            </div>
+                        </div>
+                    </Card>
+                )}
+
+                {/* Seção quando correções foram solicitadas */}
+                {latestDelivery && latestDelivery.status === 'revision_requested' && (
+                    <Card className="p-6 mt-6 border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-amber-100 dark:bg-amber-900 rounded-full">
+                                <AlertCircle className="h-6 w-6 text-amber-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-lg text-amber-700 dark:text-amber-400">
+                                    Aguardando Correções
+                                </h3>
+                                <p className="text-amber-600 dark:text-amber-500">
+                                    Você solicitou correções na versão {latestDelivery.version}.
+                                    Aguarde o editor enviar uma nova versão.
+                                </p>
+                            </div>
+                        </div>
+                    </Card>
+                )}
+
+                {/* Histórico de Revisões */}
+                {deliveries.length > 0 && (
+                    <Card className="p-6 mt-6">
+                        <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                            <History className="h-5 w-5 text-primary" />
+                            Histórico de Revisões
+                            <Badge variant="secondary" className="ml-2">
+                                {deliveries.length} versão(ões)
+                            </Badge>
+                        </h3>
+
+                        <div className="space-y-3">
+                            {deliveries.map((delivery, index) => (
+                                <div
+                                    key={delivery.id}
+                                    className={`
+                                        flex items-center justify-between p-4 rounded-lg border transition-all
+                                        ${index === 0
+                                            ? 'bg-primary/5 border-primary/30'
+                                            : 'bg-muted/50 border-muted'
+                                        }
+                                    `}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        {/* Badge de versão */}
+                                        <div className={`
+                                            w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm
+                                            ${index === 0
+                                                ? 'bg-primary text-white'
+                                                : 'bg-muted-foreground/20 text-muted-foreground'
+                                            }
+                                        `}>
+                                            v{delivery.version}
+                                        </div>
+
+                                        <div>
+                                            <p className="font-medium flex items-center gap-2">
+                                                {delivery.title || `Entrega ${delivery.version}`}
+                                                {index === 0 && (
+                                                    <Badge variant="secondary" className="text-xs">
+                                                        Atual
+                                                    </Badge>
+                                                )}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {new Date(delivery.submitted_at || delivery.created_at).toLocaleDateString('pt-BR', {
+                                                    day: '2-digit',
+                                                    month: 'short',
+                                                    year: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                })}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        {/* Status Badge Atualizado */}
+                                        <Badge
+                                            variant="outline"
+                                            className={
+                                                delivery.status === 'approved'
+                                                    ? 'bg-green-100 text-green-700 border-green-300'
+                                                    : delivery.status === 'revision_requested'
+                                                        ? 'bg-blue-100 text-blue-700 border-blue-300'
+                                                        : 'bg-amber-100 text-amber-700 border-amber-300'
+                                            }
+                                        >
+                                            {delivery.status === 'approved' && (
+                                                <span className="flex items-center gap-1">
+                                                    <CheckCircle2 className="h-3 w-3" /> Aprovado
+                                                </span>
+                                            )}
+                                            {delivery.status === 'revision_requested' && (
+                                                <span className="flex items-center gap-1">
+                                                    <CheckCircle2 className="h-3 w-3" /> Revisado ✓
+                                                </span>
+                                            )}
+                                            {delivery.status === 'pending_review' && (
+                                                <span className="flex items-center gap-1">
+                                                    <Clock className="h-3 w-3" /> Aguardando Revisão
+                                                </span>
+                                            )}
+                                        </Badge>
+
+                                        <Button
+                                            type="button"
+                                            variant={index === 0 ? 'default' : 'ghost'}
+                                            size="sm"
+                                            onClick={() => navigate(`/project/${project?.id}/revision/${delivery.version}`)}
+                                        >
+                                            {index === 0 ? 'Ver Revisão' : 'Ver Histórico'}
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </Card>
+                )}
             </div>
         </DashboardLayout>
     );

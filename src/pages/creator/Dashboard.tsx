@@ -69,14 +69,7 @@ const CreatorDashboard = () => {
     try {
       let query = supabase
         .from('projects')
-        .select(`
-          *,
-          assigned_editor:users!assigned_editor_id(
-            full_name,
-            username,
-            profile_photo_url
-          )
-        `)
+        .select('*')
         .eq('creator_id', user.id);
 
       // Apply status filter
@@ -91,8 +84,27 @@ const CreatorDashboard = () => {
 
       if (error) throw error;
 
-      // Load application counts for each project
+      // Collect project IDs and assigned editor IDs
       const projectIds = data?.map(p => p.id) || [];
+      const editorIds = Array.from(new Set(data?.map(p => p.assigned_editor_id).filter(Boolean) || []));
+
+      // Fetch editor profiles separately
+      let editorsMap: Record<string, any> = {};
+      if (editorIds.length > 0) {
+        const { data: editorsData } = await supabase
+          .from('users')
+          .select('id, full_name, username, profile_photo_url')
+          .in('id', editorIds);
+
+        if (editorsData) {
+          editorsMap = editorsData.reduce((acc, editor) => {
+            acc[editor.id] = editor;
+            return acc;
+          }, {} as Record<string, any>);
+        }
+      }
+
+      // Load application counts for each project
       let applicationCounts: Record<string, number> = {};
 
       if (projectIds.length > 0) {
@@ -115,22 +127,23 @@ const CreatorDashboard = () => {
 
       const reviewedProjectIds = new Set(reviewsData?.map(r => r.project_id));
 
-      // Transform projects to include _count and has_reviewed
-      const projectsWithCounts = data?.map(project => ({
+      // Transform projects to include _count, has_reviewed, and assigned_editor
+      const projectsWithDetails = data?.map(project => ({
         ...project,
         _count: {
           applications: applicationCounts[project.id] || 0
         },
-        has_reviewed: reviewedProjectIds.has(project.id)
+        has_reviewed: reviewedProjectIds.has(project.id),
+        assigned_editor: project.assigned_editor_id ? editorsMap[project.assigned_editor_id] : null
       })) || [];
 
-      setProjects(projectsWithCounts);
+      setProjects(projectsWithDetails);
 
       // Calculate metrics
       setMetrics({
-        activeProjects: projectsWithCounts.filter(p => p.status === 'in_progress').length,
-        completedProjects: projectsWithCounts.filter(p => p.status === 'completed').length,
-        awaitingReview: projectsWithCounts.filter(p => p.status === 'in_review').length,
+        activeProjects: projectsWithDetails.filter(p => p.status === 'in_progress').length,
+        completedProjects: projectsWithDetails.filter(p => p.status === 'completed').length,
+        awaitingReview: projectsWithDetails.filter(p => p.status === 'in_review').length,
       });
     } catch (error) {
       console.error('Error fetching projects:', error);

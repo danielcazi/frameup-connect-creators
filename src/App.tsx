@@ -14,6 +14,7 @@ import CreatorDashboard from "./pages/creator/Dashboard";
 import ProjectApplications from "./pages/creator/ProjectApplications";
 import NewProject from "./pages/creator/NewProject";
 import CreatorProjectDetails from "./pages/creator/ProjectDetails";
+import EditProject from "./pages/creator/EditProject";
 
 import Payment from "./pages/creator/Payment";
 import PaymentSuccess from "./pages/creator/PaymentSuccess";
@@ -54,6 +55,9 @@ import CreatorProjects from "./pages/creator/Projects";
 import CreatorEditors from "./pages/creator/Editors";
 import CreatorProfile from "./pages/creator/Profile";
 import EditorProposals from "./pages/editor/Proposals";
+import DeliverVideo from "./pages/editor/DeliverVideo";
+import ReviewDelivery from "./pages/creator/ReviewDelivery";
+import RevisionView from "./pages/shared/RevisionView";
 
 const queryClient = new QueryClient();
 
@@ -94,6 +98,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredUserType="creator">
                     <CreatorProjectDetails />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/creator/project/:id/edit"
+                element={
+                  <ProtectedRoute requiredUserType="creator">
+                    <EditProject />
                   </ProtectedRoute>
                 }
               />
@@ -179,6 +191,14 @@ const App = () => (
                 }
               />
               <Route
+                path="/creator/project/:id/review"
+                element={
+                  <ProtectedRoute requiredUserType="creator">
+                    <ReviewDelivery />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/creator/profile"
                 element={
                   <ProtectedRoute requiredUserType="creator">
@@ -256,6 +276,14 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/editor/project/:id/deliver"
+                element={
+                  <ProtectedRoute requiredUserType="editor">
+                    <DeliverVideo />
+                  </ProtectedRoute>
+                }
+              />
 
               <Route
                 path="/editor/profile/edit"
@@ -302,6 +330,16 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredUserType="editor">
                     <Messages />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Shared Routes */}
+              <Route
+                path="/project/:id/revision/:version"
+                element={
+                  <ProtectedRoute>
+                    <RevisionView />
                   </ProtectedRoute>
                 }
               />

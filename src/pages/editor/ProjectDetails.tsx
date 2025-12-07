@@ -25,7 +25,16 @@ import {
     ArrowLeft,
     CheckCircle,
     AlertCircle,
+    MessageSquare,
+    Upload,
+    History,
+    Video,
+    CheckCircle2,
+    AlertTriangle,
+    Send
 } from 'lucide-react';
+import { getProjectDeliveries } from '@/services/deliveryService';
+import type { ProjectDelivery } from '@/types/delivery';
 
 interface Project {
     id: string;
@@ -38,6 +47,9 @@ interface Project {
     deadline_days: number;
     reference_files_url?: string;
     created_at: string;
+    status: string;
+    payment_status: string;
+    assigned_editor_id?: string;
     users: {
         id: string;
         full_name: string;
@@ -59,6 +71,9 @@ function ProjectDetails() {
     const [applicationCount, setApplicationCount] = useState(0);
     const [currentProjectsCount, setCurrentProjectsCount] = useState(0);
     const [showApplicationModal, setShowApplicationModal] = useState(false);
+    const [isAssigned, setIsAssigned] = useState(false);
+    const [deliveries, setDeliveries] = useState<ProjectDelivery[]>([]);
+    const [latestDelivery, setLatestDelivery] = useState<ProjectDelivery | null>(null);
 
     useEffect(() => {
         if (id) {
@@ -73,33 +88,55 @@ function ProjectDetails() {
         try {
             setLoading(true);
 
-            // Ajustando query para usar alias 'users:creator_id' que é mais seguro se a FK for padrão
+            // Buscar o projeto sem filtro de status para verificar se o editor está atribuído
             const { data, error } = await supabase
                 .from('projects')
                 .select(`
-          *,
-          users:creator_id (
-            id,
-            full_name,
-            username,
-            profile_photo_url
-          )
-        `)
+                    *,
+                    users:creator_id (
+                        id,
+                        full_name,
+                        username,
+                        profile_photo_url
+                    )
+                `)
                 .eq('id', id)
-                .eq('status', 'open')
-                .eq('payment_status', 'paid')
                 .single();
 
             if (error) throw error;
 
+            // Verificar se o editor tem acesso ao projeto
+            const isAssignedEditor = data.assigned_editor_id === user?.id;
+            const isOpenForApplications = data.status === 'open' && data.payment_status === 'paid';
+
+            // Se não é o editor atribuído E não está aberto para candidaturas, negar acesso
+            if (!isAssignedEditor && !isOpenForApplications) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Acesso negado',
+                    description: 'Este projeto não está mais disponível para visualização.',
+                });
+                navigate('/editor/dashboard');
+                return;
+            }
+
             // @ts-ignore
             setProject(data);
+            setIsAssigned(isAssignedEditor);
+
+            if (isAssignedEditor) {
+                const projectDeliveries = await getProjectDeliveries(id!);
+                setDeliveries(projectDeliveries);
+                if (projectDeliveries.length > 0) {
+                    setLatestDelivery(projectDeliveries[0]);
+                }
+            }
         } catch (error) {
             console.error('Error loading project:', error);
             toast({
                 variant: 'destructive',
                 title: 'Erro',
-                description: 'Projeto não encontrado ou não está mais disponível',
+                description: 'Projeto não encontrado.',
             });
             navigate('/editor/dashboard');
         } finally {
@@ -196,6 +233,9 @@ function ProjectDetails() {
         !hasApplied &&
         !isFull &&
         currentProjectsCount < (subscription?.subscription_plans.max_simultaneous_projects || 0);
+
+    // Se o editor está atribuído ao projeto, mostrar botões de trabalho
+    const showWorkActions = isAssigned && ['in_progress', 'in_review', 'revision_requested'].includes(project?.status || '');
 
     return (
         <SubscriptionGuard requireActive={true}>
@@ -375,48 +415,283 @@ function ProjectDetails() {
                         </div>
                     </Card>
 
-                    {/* Action Card */}
-                    <Card className="p-8">
-                        <h3 className="text-lg font-semibold text-foreground mb-4">
-                            Candidatar-se ao Projeto
-                        </h3>
-
-                        {hasApplied ? (
-                            <div className="text-center py-8">
-                                <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-4" />
-                                <p className="text-muted-foreground mb-6">
-                                    Você já se candidatou a este projeto. Aguarde a resposta do criador.
-                                </p>
-                                <Button
-                                    variant="secondary"
-                                    size="lg"
-                                    onClick={() => navigate('/editor/dashboard')}
-                                >
-                                    Voltar ao Marketplace
-                                </Button>
+                    {/* Ações do Editor Atribuído */}
+                    {showWorkActions && (
+                        <Card className="p-6 border-primary/20 bg-primary/5">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-2 bg-primary/10 rounded-lg">
+                                    <CheckCircle className="w-5 h-5 text-primary" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-foreground">Você está trabalhando neste projeto</h3>
+                                    <p className="text-sm text-muted-foreground">
+                                        Status: {project?.status === 'in_progress' ? 'Em Andamento' :
+                                            project?.status === 'in_review' ? 'Em Revisão' :
+                                                project?.status === 'revision_requested' ? 'Revisão Solicitada' : project?.status}
+                                    </p>
+                                </div>
                             </div>
-                        ) : (
-                            <>
-                                <p className="text-muted-foreground mb-6">
-                                    Ao se candidatar, você demonstra interesse em trabalhar neste projeto.
-                                    O criador analisará seu perfil e portfólio antes de tomar uma decisão.
-                                </p>
 
+                            <div className="flex flex-wrap gap-3">
                                 <Button
-                                    size="lg"
-                                    className="w-full"
-                                    onClick={() => setShowApplicationModal(true)}
-                                    disabled={!canApply || isFull}
+                                    type="button"
+                                    onClick={() => navigate(`/editor/project/${project?.id}/chat`)}
+                                    variant="outline"
+                                    className="flex-1"
                                 >
-                                    {isFull
-                                        ? 'Vagas Preenchidas'
-                                        : !canApply
-                                            ? 'Limite de Projetos Atingido'
-                                            : 'Candidatar-se Agora'}
+                                    <MessageSquare className="w-4 h-4 mr-2" />
+                                    Chat com Creator
                                 </Button>
-                            </>
-                        )}
-                    </Card>
+
+                                {project?.status === 'in_progress' && (
+                                    <Button
+                                        type="button"
+                                        onClick={() => navigate(`/editor/project/${project?.id}/deliver`)}
+                                        className="flex-1"
+                                    >
+                                        <Upload className="w-4 h-4 mr-2" />
+                                        Entregar Vídeo
+                                    </Button>
+                                )}
+
+                                {project?.status === 'revision_requested' && (
+                                    <Button
+                                        type="button"
+                                        onClick={() => navigate(`/editor/project/${project?.id}/deliver`)}
+                                        variant="destructive"
+                                        className="flex-1"
+                                    >
+                                        <Upload className="w-4 h-4 mr-2" />
+                                        Enviar Revisão
+                                    </Button>
+                                )}
+                            </div>
+                        </Card>
+                    )}
+
+                    {/* Histórico de Revisões */}
+                    {deliveries.length > 0 && (
+                        <Card className="p-6 mt-6">
+                            <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                                <History className="h-5 w-5 text-primary" />
+                                Histórico de Revisões
+                                <Badge variant="secondary" className="ml-2">
+                                    {deliveries.length} versão(ões)
+                                </Badge>
+                            </h3>
+
+                            <div className="space-y-3">
+                                {deliveries.map((delivery, index) => (
+                                    <div
+                                        key={delivery.id}
+                                        className={`
+                                        flex items-center justify-between p-4 rounded-lg border transition-all
+                                        ${index === 0
+                                                ? 'bg-primary/5 border-primary/30'
+                                                : 'bg-muted/50 border-muted'
+                                            }
+                                    `}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            {/* Badge de versão */}
+                                            <div className={`
+                                            w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm
+                                            ${index === 0
+                                                    ? 'bg-primary text-white'
+                                                    : 'bg-muted-foreground/20 text-muted-foreground'
+                                                }
+                                        `}>
+                                                v{delivery.version}
+                                            </div>
+
+                                            <div>
+                                                <p className="font-medium flex items-center gap-2">
+                                                    {delivery.title || `Entrega ${delivery.version}`}
+                                                    {index === 0 && (
+                                                        <Badge variant="secondary" className="text-xs">
+                                                            Atual
+                                                        </Badge>
+                                                    )}
+                                                </p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {new Date(delivery.submitted_at || delivery.created_at).toLocaleDateString('pt-BR', {
+                                                        day: '2-digit',
+                                                        month: 'short',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3">
+                                            {/* Status Badge Atualizado */}
+                                            <Badge
+                                                variant="outline"
+                                                className={
+                                                    delivery.status === 'approved'
+                                                        ? 'bg-green-100 text-green-700 border-green-300'
+                                                        : delivery.status === 'revision_requested'
+                                                            ? 'bg-blue-100 text-blue-700 border-blue-300'
+                                                            : 'bg-amber-100 text-amber-700 border-amber-300'
+                                                }
+                                            >
+                                                {delivery.status === 'approved' && (
+                                                    <span className="flex items-center gap-1">
+                                                        <CheckCircle2 className="h-3 w-3" /> Aprovado
+                                                    </span>
+                                                )}
+                                                {delivery.status === 'revision_requested' && (
+                                                    <span className="flex items-center gap-1">
+                                                        <CheckCircle2 className="h-3 w-3" /> Revisado ✓
+                                                    </span>
+                                                )}
+                                                {delivery.status === 'pending_review' && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Clock className="h-3 w-3" /> Aguardando Revisão
+                                                    </span>
+                                                )}
+                                            </Badge>
+
+                                            <Button
+                                                type="button"
+                                                variant={index === 0 ? 'default' : 'ghost'}
+                                                size="sm"
+                                                onClick={() => navigate(`/project/${id}/revision/${delivery.version}`)}
+                                            >
+                                                {index === 0 ? 'Ver Revisão' : 'Ver Histórico'}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    )}
+
+                    {/* Seção para enviar nova versão - Aparece quando Creator pediu correções */}
+                    {latestDelivery && latestDelivery.status === 'revision_requested' && (
+                        <Card className="p-6 mt-6 border-primary/50 bg-gradient-to-r from-primary/5 to-primary/10">
+                            <div className="flex items-start gap-4">
+                                <div className="p-3 bg-primary/20 rounded-full">
+                                    <Upload className="h-6 w-6 text-primary" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-semibold text-lg">Enviar Nova Versão</h3>
+                                    <p className="text-muted-foreground mt-1">
+                                        O Creator solicitou correções na versão {latestDelivery.version}.
+                                        Envie a versão {latestDelivery.version + 1} com as alterações.
+                                    </p>
+
+                                    {/* Feedback do Creator */}
+                                    {latestDelivery.creator_feedback && (
+                                        <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                            <p className="text-sm font-medium text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                                                <AlertTriangle className="h-4 w-4" />
+                                                Feedback do Creator:
+                                            </p>
+                                            <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                                                {latestDelivery.creator_feedback}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <Button
+                                        className="mt-4"
+                                        onClick={() => navigate(`/editor/project/${id}/deliver`)}
+                                    >
+                                        <Send className="h-4 w-4 mr-2" />
+                                        Enviar Versão {latestDelivery.version + 1}
+                                    </Button>
+                                </div>
+                            </div>
+                        </Card>
+                    )}
+
+                    {/* Seção quando está aguardando revisão do Creator */}
+                    {latestDelivery && latestDelivery.status === 'pending_review' && (
+                        <Card className="p-6 mt-6 border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-amber-100 dark:bg-amber-900 rounded-full animate-pulse">
+                                    <Video className="h-6 w-6 text-amber-600" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-lg text-amber-700 dark:text-amber-400">
+                                        Aguardando Revisão do Creator
+                                    </h3>
+                                    <p className="text-amber-600 dark:text-amber-500">
+                                        Sua versão {latestDelivery.version} está sendo analisada.
+                                        Você será notificado quando houver feedback.
+                                    </p>
+                                </div>
+                            </div>
+                        </Card>
+                    )}
+
+                    {/* Seção quando projeto foi aprovado */}
+                    {latestDelivery && latestDelivery.status === 'approved' && (
+                        <Card className="p-6 mt-6 border-green-500/50 bg-green-50/50 dark:bg-green-950/20">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-green-100 dark:bg-green-900 rounded-full">
+                                    <CheckCircle2 className="h-6 w-6 text-green-600" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-lg text-green-700 dark:text-green-400">
+                                        Projeto Aprovado! 🎉
+                                    </h3>
+                                    <p className="text-green-600 dark:text-green-500">
+                                        O Creator aprovou a versão {latestDelivery.version}.
+                                        O pagamento será processado em breve.
+                                    </p>
+                                </div>
+                            </div>
+                        </Card>
+                    )}
+
+                    {/* Action Card - Candidatura (só mostra se NÃO está atribuído) */}
+                    {!isAssigned && (
+                        <Card className="p-8">
+                            <h3 className="text-lg font-semibold text-foreground mb-4">
+                                Candidatar-se ao Projeto
+                            </h3>
+
+                            {hasApplied ? (
+                                <div className="text-center py-8">
+                                    <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-4" />
+                                    <p className="text-muted-foreground mb-6">
+                                        Você já se candidatou a este projeto. Aguarde a resposta do criador.
+                                    </p>
+                                    <Button
+                                        variant="secondary"
+                                        size="lg"
+                                        onClick={() => navigate('/editor/dashboard')}
+                                    >
+                                        Voltar ao Marketplace
+                                    </Button>
+                                </div>
+                            ) : (
+                                <>
+                                    <p className="text-muted-foreground mb-6">
+                                        Ao se candidatar, você demonstra interesse em trabalhar neste projeto.
+                                        O criador analisará seu perfil e portfólio antes de tomar uma decisão.
+                                    </p>
+
+                                    <Button
+                                        size="lg"
+                                        className="w-full"
+                                        onClick={() => setShowApplicationModal(true)}
+                                        disabled={!canApply || isFull}
+                                    >
+                                        {isFull
+                                            ? 'Vagas Preenchidas'
+                                            : !canApply
+                                                ? 'Limite de Projetos Atingido'
+                                                : 'Candidatar-se Agora'}
+                                    </Button>
+                                </>
+                            )}
+                        </Card>
+                    )}
                 </div>
 
                 {/* Application Modal */}

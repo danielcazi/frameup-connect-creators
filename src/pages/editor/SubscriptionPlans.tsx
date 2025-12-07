@@ -59,46 +59,41 @@ function SubscriptionPlans() {
     async function checkExistingSubscription() {
         if (!user) return;
         try {
+            // Verificar em user_subscriptions (tabela usada pela Edge Function)
             const { data } = await supabase
-                .from('editor_subscriptions')
+                .from('user_subscriptions')
                 .select('*, subscription_plans(*)')
-                .eq('editor_id', user.id)
+                .eq('user_id', user.id)
                 .eq('status', 'active')
-                .eq('status', 'active')
-                .single();
+                .maybeSingle();
 
-            const userEmail = (user.email || user.user_metadata?.email || '').toLowerCase().trim();
-            if (data || userEmail === 'editorfull@frameup.com') {
+            if (data) {
                 toast({
                     title: 'Assinatura ativa',
                     description: 'Você já possui uma assinatura ativa'
                 });
-                // navigate('/editor/subscription/manage'); // Página de gerenciamento ainda não existe
+                navigate('/editor/subscription/manage');
             }
         } catch (error) {
-            // Sem assinatura ativa - OK
+            // Sem assinatura ativa - OK, usuário pode assinar
+            console.log('No active subscription found');
         }
     }
 
     async function handleSubscribe(planName: string) {
+        if (!user) {
+            toast({
+                variant: 'destructive',
+                title: 'Erro',
+                description: 'Você precisa estar logado para assinar'
+            });
+            return;
+        }
+
         setSubscribing(true);
         setSelectedPlan(planName);
 
         try {
-            const userEmail = (user?.email || user?.user_metadata?.email || '').toLowerCase().trim();
-            if (userEmail === 'editorfull@frameup.com') {
-                // Simulate success for bypassed user
-                setTimeout(() => {
-                    toast({
-                        title: 'Sucesso',
-                        description: 'Plano ativado com sucesso!'
-                    });
-                    setSubscribing(false);
-                    navigate('/editor/subscription/manage');
-                }, 1000);
-                return;
-            }
-
             // Chamar Edge Function para criar checkout
             const { data: session, error } = await supabase.functions.invoke(
                 'create-subscription',
@@ -107,22 +102,54 @@ function SubscriptionPlans() {
                 }
             );
 
-            if (error) throw error;
+            if (error) {
+                console.error('Edge Function error:', error);
+
+                // Verificar se é erro de assinatura já existente
+                if (error.message?.includes('já possui uma assinatura')) {
+                    toast({
+                        title: 'Assinatura existente',
+                        description: 'Você já possui uma assinatura ativa. Redirecionando...'
+                    });
+                    navigate('/editor/subscription/manage');
+                    return;
+                }
+
+                throw error;
+            }
 
             if (session?.url) {
                 // Redirecionar para Stripe Checkout
                 window.location.href = session.url;
             } else {
-                throw new Error('URL de checkout não retornada');
+                throw new Error('URL de checkout não retornada pelo servidor');
             }
 
         } catch (error: any) {
             console.error('Error creating subscription:', error);
+
+            let errorMessage = 'Erro ao processar assinatura. Tente novamente.';
+
+            if (error.message) {
+                errorMessage = error.message;
+            } else if (error.context?.body) {
+                // Tentar extrair mensagem do corpo do erro da Edge Function
+                try {
+                    const body = typeof error.context.body === 'string'
+                        ? JSON.parse(error.context.body)
+                        : error.context.body;
+                    errorMessage = body.error || errorMessage;
+                } catch {
+                    // Ignorar erro de parse
+                }
+            }
+
             toast({
                 variant: 'destructive',
                 title: 'Erro',
-                description: error.message || 'Erro ao processar assinatura'
+                description: errorMessage
             });
+        } finally {
             setSubscribing(false);
             setSelectedPlan(null);
         }

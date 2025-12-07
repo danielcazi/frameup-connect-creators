@@ -50,7 +50,7 @@ interface Filters {
 
 function EditorDashboard() {
   const { user } = useAuth();
-  const { subscription } = useSubscription();
+  const { subscription, hasActiveSubscription } = useSubscription();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -120,19 +120,34 @@ function EditorDashboard() {
       // 1. Load In Progress Projects
       const { data: inProgressData } = await supabase
         .from('projects')
-        .select(`
-          *,
-          users:creator_id (
-            full_name,
-            username,
-            profile_photo_url
-          )
-        `)
+        .select('*')
         .eq('assigned_editor_id', user.id)
-        .eq('status', 'in_progress');
+        .in('status', ['in_progress', 'in_review', 'revision_requested']);
 
-      setInProgressProjects(inProgressData || []);
-      setCurrentProjectsCount(inProgressData?.length || 0);
+      let projectsWithCreator = [];
+      if (inProgressData && inProgressData.length > 0) {
+        const creatorIds = Array.from(new Set(inProgressData.map(p => p.creator_id).filter(Boolean)));
+        let creatorsMap: Record<string, any> = {};
+
+        if (creatorIds.length > 0) {
+          const { data: creatorsData } = await supabase
+            .from('users')
+            .select('id, full_name, username, profile_photo_url')
+            .in('id', creatorIds);
+
+          if (creatorsData) {
+            creatorsMap = creatorsData.reduce((acc, c) => ({ ...acc, [c.id]: c }), {});
+          }
+        }
+
+        projectsWithCreator = inProgressData.map(p => ({
+          ...p,
+          users: creatorsMap[p.creator_id] || { full_name: 'Desconhecido', username: 'unknown' }
+        }));
+      }
+
+      setInProgressProjects(projectsWithCreator);
+      setCurrentProjectsCount(projectsWithCreator.length);
 
       // 2. Load Completed Projects Count & Earnings
       const { data: completedData } = await supabase
@@ -147,21 +162,37 @@ function EditorDashboard() {
         setTotalEarnings(earnings);
       }
 
-      // 3. Load Recent Messages (Mocked for now as we don't have a direct API here)
-      // In a real scenario, we would fetch from 'messages' table joining with users
-      // For now, let's use a placeholder or try to fetch if possible.
-      // Let's try to fetch real messages if the table exists and RLS allows.
+      // 3. Load Recent Messages
       const { data: messagesData } = await supabase
         .from('messages')
-        .select(`
-          *,
-          sender:sender_id(full_name, profile_photo_url)
-        `)
+        .select('*')
         .eq('receiver_id', user.id)
         .order('created_at', { ascending: false })
         .limit(3);
 
-      setRecentMessages(messagesData || []);
+      let messagesWithSender = [];
+      if (messagesData && messagesData.length > 0) {
+        const senderIds = Array.from(new Set(messagesData.map(m => m.sender_id).filter(Boolean)));
+        let sendersMap: Record<string, any> = {};
+
+        if (senderIds.length > 0) {
+          const { data: sendersData } = await supabase
+            .from('users')
+            .select('id, full_name, profile_photo_url')
+            .in('id', senderIds);
+
+          if (sendersData) {
+            sendersMap = sendersData.reduce((acc, s) => ({ ...acc, [s.id]: s }), {});
+          }
+        }
+
+        messagesWithSender = messagesData.map(m => ({
+          ...m,
+          sender: sendersMap[m.sender_id] || { full_name: 'Desconhecido' }
+        }));
+      }
+
+      setRecentMessages(messagesWithSender);
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -189,11 +220,7 @@ function EditorDashboard() {
           base_price,
           deadline_days,
           created_at,
-          users:users!projects_creator_id_fkey (
-            full_name,
-            username,
-            profile_photo_url
-          )
+          creator_id
         `)
         .eq('status', 'open')
         .eq('payment_status', 'paid')
@@ -217,9 +244,25 @@ function EditorDashboard() {
         }, {} as Record<string, number>) || {};
       }
 
+      // Manual fetch for creator details
+      const creatorIds = Array.from(new Set(data.map(p => p.creator_id).filter(Boolean)));
+      let creatorsMap: Record<string, any> = {};
+
+      if (creatorIds.length > 0) {
+        const { data: creatorsData } = await supabase
+          .from('users')
+          .select('id, full_name, username, profile_photo_url')
+          .in('id', creatorIds);
+
+        if (creatorsData) {
+          creatorsMap = creatorsData.reduce((acc, c) => ({ ...acc, [c.id]: c }), {});
+        }
+      }
+
       // @ts-ignore
       const projectsWithCounts = data.map(project => ({
         ...project,
+        users: creatorsMap[project.creator_id] || { full_name: 'Desconhecido', username: 'unknown' },
         _count: {
           applications: applicationCounts[project.id] || 0
         }
@@ -406,7 +449,13 @@ function EditorDashboard() {
                         </div>
                         <div>
                           <h3 className="font-medium text-foreground">{project.title}</h3>
-                          <p className="text-sm text-muted-foreground">Entrega em {project.deadline_days} dias</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-muted-foreground">
+                              {project.status === 'in_review' && '⏳ Aguardando revisão do Creator'}
+                              {project.status === 'revision_requested' && '🔄 Correções solicitadas'}
+                              {project.status === 'in_progress' && `Entrega em ${project.deadline_days} dias`}
+                            </p>
+                          </div>
                         </div>
                       </div>
                       <Button variant="outline" size="sm" onClick={() => navigate(`/editor/project/${project.id}`)}>
@@ -495,6 +544,7 @@ function EditorDashboard() {
                       canApply={
                         currentProjectsCount < (subscription?.subscription_plans.max_simultaneous_projects || 0)
                       }
+                      hasSubscription={hasActiveSubscription()}
                       onApply={() => navigate(`/editor/project/${project.id}`)}
                     />
                   ))}

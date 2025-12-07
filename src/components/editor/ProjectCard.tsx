@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,9 @@ import {
     Users,
     CheckCircle,
     Lock,
+    Crown,
 } from 'lucide-react';
+import SubscriptionRequiredModal from '@/components/subscription/SubscriptionRequiredModal';
 
 interface Project {
     id: string;
@@ -38,12 +41,21 @@ interface ProjectCardProps {
     project: Project;
     hasApplied: boolean;
     canApply: boolean;
+    hasSubscription: boolean; // NOVO: indica se tem assinatura ativa
     onApply: () => void;
     showStatus?: boolean;
 }
 
-function ProjectCard({ project, hasApplied, canApply, onApply, showStatus }: ProjectCardProps) {
+function ProjectCard({
+    project,
+    hasApplied,
+    canApply,
+    hasSubscription,
+    onApply,
+    showStatus
+}: ProjectCardProps) {
     const navigate = useNavigate();
+    const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
     const statusLabels: Record<string, string> = {
         open: 'Aberto',
@@ -99,136 +111,172 @@ function ProjectCard({ project, hasApplied, canApply, onApply, showStatus }: Pro
     const applicationCount = project._count?.applications || 0;
     const isFull = applicationCount >= 5;
 
+    // Determinar qual botão mostrar
+    function renderActionButton() {
+        // Já se candidatou
+        if (hasApplied) {
+            return (
+                <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={onApply}
+                >
+                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
+                    Ver Detalhes
+                </Button>
+            );
+        }
+
+        // Vagas preenchidas
+        if (isFull) {
+            return (
+                <Button
+                    variant="secondary"
+                    className="w-full"
+                    disabled
+                >
+                    <Lock className="w-4 h-4 mr-2" />
+                    Vagas Preenchidas
+                </Button>
+            );
+        }
+
+        // Sem assinatura - mostrar botão para assinar
+        if (!hasSubscription) {
+            return (
+                <Button
+                    className="w-full"
+                    onClick={() => setShowSubscriptionModal(true)}
+                >
+                    <Crown className="w-4 h-4 mr-2" />
+                    Candidatar-se
+                </Button>
+            );
+        }
+
+        // Tem assinatura mas atingiu limite de projetos
+        if (!canApply) {
+            return (
+                <Button
+                    variant="secondary"
+                    className="w-full"
+                    disabled
+                >
+                    <Lock className="w-4 h-4 mr-2" />
+                    Limite de Projetos
+                </Button>
+            );
+        }
+
+        // Pode se candidatar normalmente
+        return (
+            <Button
+                className="w-full"
+                onClick={onApply}
+            >
+                Ver Detalhes e Candidatar-se
+            </Button>
+        );
+    }
+
     return (
-        <div className="bg-card rounded-lg border border-border hover:border-primary/50 hover:shadow-md transition-all duration-200 flex flex-col h-full">
-            {/* Header */}
-            <div className="p-4 border-b border-border flex-1">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                    <h3
-                        className="font-semibold text-foreground line-clamp-2 cursor-pointer hover:text-primary transition-colors"
-                        onClick={onApply}
-                    >
-                        {project.title}
-                    </h3>
+        <>
+            <div className="bg-card rounded-lg border border-border hover:border-primary/50 transition-all p-6">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                        <Avatar className="w-10 h-10">
+                            <AvatarImage src={project.users.profile_photo_url} />
+                            <AvatarFallback>
+                                {project.users.full_name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                        </Avatar>
+                        <div>
+                            <p className="font-medium text-foreground text-sm">
+                                {project.users.full_name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                @{project.users.username}
+                            </p>
+                        </div>
+                    </div>
+
+                    {showStatus && project.status && (
+                        <Badge className={statusColors[project.status]}>
+                            {statusLabels[project.status]}
+                        </Badge>
+                    )}
 
                     {hasApplied && !showStatus && (
-                        <Badge className="bg-green-500 hover:bg-green-600 text-white shrink-0">
+                        <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                             <CheckCircle className="w-3 h-3 mr-1" />
                             Candidatado
                         </Badge>
                     )}
-
-                    {showStatus && project.status && (
-                        <Badge className={`${statusColors[project.status] || 'bg-gray-500'} text-white shrink-0`}>
-                            {statusLabels[project.status] || project.status}
-                        </Badge>
-                    )}
                 </div>
 
-                <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                {/* Title */}
+                <h3 className="font-semibold text-foreground text-lg mb-2 line-clamp-2">
+                    {project.title}
+                </h3>
+
+                {/* Description */}
+                <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                     {project.description}
                 </p>
 
-                {/* Creator */}
-                <div className="flex items-center gap-2">
-                    <Avatar className="w-8 h-8">
-                        <AvatarImage src={project.users.profile_photo_url} alt={project.users.full_name} />
-                        <AvatarFallback>{project.users?.full_name?.charAt(0)?.toUpperCase() || '?'}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">
-                            {project.users.full_name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">@{project.users.username}</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Details */}
-            <div className="p-4 space-y-3">
-                {/* Video Type & Style */}
-                <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary" className="font-normal">
+                {/* Tags */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                    <Badge variant="outline" className="text-xs">
                         <Film className="w-3 h-3 mr-1" />
                         {videoTypeLabels[project.video_type] || project.video_type}
                     </Badge>
-                    <Badge variant="default" className="font-normal">
+                    <Badge variant="outline" className="text-xs">
                         <Sparkles className="w-3 h-3 mr-1" />
                         {editingStyleLabels[project.editing_style] || project.editing_style}
                     </Badge>
                 </div>
 
-                {/* Info Grid */}
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                    {/* Duration */}
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                        <Clock className="w-4 h-4 flex-shrink-0" />
-                        <span>{durationLabels[project.duration_category] || project.duration_category}</span>
+                {/* Info */}
+                <div className="space-y-2 mb-4">
+                    <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            {durationLabels[project.duration_category] || project.duration_category}
+                        </span>
+                        <span className="text-muted-foreground flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            {project.deadline_days} dias
+                        </span>
                     </div>
 
-                    {/* Deadline */}
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="w-4 h-4 flex-shrink-0" />
-                        <span>{project.deadline_days} dias</span>
-                    </div>
-
-                    {/* Price */}
-                    <div className="flex items-center gap-2 text-green-600 font-semibold col-span-2">
-                        <DollarSign className="w-4 h-4 flex-shrink-0" />
-                        <span>R$ {Number(project.base_price).toFixed(2).replace('.', ',')}</span>
-                    </div>
-                </div>
-
-                {/* Applications Count */}
-                <div className="flex items-center justify-between text-sm pt-3 border-t border-border">
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Users className="w-4 h-4" />
-                        <span>
+                    <div className="flex items-center justify-between">
+                        <span className="text-lg font-bold text-primary flex items-center gap-1">
+                            <DollarSign className="w-5 h-5" />
+                            R$ {project.base_price.toFixed(2).replace('.', ',')}
+                        </span>
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Users className="w-3 h-3" />
                             {applicationCount} candidatura{applicationCount !== 1 ? 's' : ''}
                         </span>
                     </div>
-                    <span className="text-xs text-muted-foreground">{getTimeAgo(project.created_at)}</span>
                 </div>
+
+                {/* Timestamp */}
+                <p className="text-xs text-muted-foreground mb-4">
+                    {getTimeAgo(project.created_at)}
+                </p>
+
+                {/* Action Button */}
+                {renderActionButton()}
             </div>
 
-            {/* Footer Actions */}
-            <div className="p-4 pt-0 mt-auto">
-                {hasApplied ? (
-                    <Button
-                        variant="secondary"
-                        className="w-full"
-                        onClick={onApply}
-                    >
-                        Ver Detalhes
-                    </Button>
-                ) : isFull ? (
-                    <Button
-                        variant="secondary"
-                        className="w-full"
-                        disabled
-                    >
-                        <Lock className="w-4 h-4 mr-2" />
-                        Vagas Preenchidas
-                    </Button>
-                ) : !canApply ? (
-                    <Button
-                        variant="secondary"
-                        className="w-full"
-                        disabled
-                    >
-                        <Lock className="w-4 h-4 mr-2" />
-                        Limite Atingido
-                    </Button>
-                ) : (
-                    <Button
-                        className="w-full"
-                        onClick={onApply}
-                    >
-                        Ver Detalhes e Candidatar-se
-                    </Button>
-                )}
-            </div>
-        </div>
+            {/* Modal de Assinatura */}
+            <SubscriptionRequiredModal
+                isOpen={showSubscriptionModal}
+                onClose={() => setShowSubscriptionModal(false)}
+            />
+        </>
     );
 }
 

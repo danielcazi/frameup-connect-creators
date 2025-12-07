@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { Dispute, DisputeWithDetails, DisputePriority, DisputeStatus } from '@/types/admin';
 
 // Listar disputas
+// Listar disputas
 export async function getDisputes(
     status?: DisputeStatus,
     priority?: DisputePriority,
@@ -12,9 +13,7 @@ export async function getDisputes(
             .from('disputes')
             .select(`
         *,
-        project:projects!project_id (id, title, base_price, status),
-        opened_by_user:auth.users!opened_by (id, email),
-        disputed_user:auth.users!disputed_user_id (id, email)
+        project:projects!project_id (id, title, base_price, status)
       `)
             .order('created_at', { ascending: false });
 
@@ -24,7 +23,33 @@ export async function getDisputes(
 
         const { data, error } = await query;
         if (error) throw error;
-        return data;
+
+        // Collect user IDs
+        const userIds = new Set<string>();
+        data?.forEach((d) => {
+            if (d.opened_by) userIds.add(d.opened_by);
+            if (d.disputed_user_id) userIds.add(d.disputed_user_id);
+        });
+
+        // Fetch users
+        let usersMap: Record<string, any> = {};
+        if (userIds.size > 0) {
+            const { data: users } = await supabase
+                .from('users')
+                .select('id, email')
+                .in('id', Array.from(userIds));
+
+            if (users) {
+                usersMap = users.reduce((acc, u) => ({ ...acc, [u.id]: u }), {});
+            }
+        }
+
+        // Map users to disputes
+        return data?.map((d) => ({
+            ...d,
+            opened_by_user: usersMap[d.opened_by] || { id: d.opened_by, email: 'unknown' },
+            disputed_user: usersMap[d.disputed_user_id] || { id: d.disputed_user_id, email: 'unknown' },
+        }));
     } catch (error) {
         console.error('Erro ao buscar disputas:', error);
         throw error;
@@ -38,14 +63,33 @@ export async function getDisputeDetails(disputeId: string): Promise<DisputeWithD
             .from('disputes')
             .select(`
         *,
-        project:projects!project_id (id, title, base_price, status),
-        opened_by_user:auth.users!opened_by (id, email),
-        disputed_user:auth.users!disputed_user_id (id, email)
+        project:projects!project_id (id, title, base_price, status)
       `)
             .eq('id', disputeId)
             .single();
 
         if (disputeError) throw disputeError;
+
+        // Fetch users manually
+        const userIds = [dispute.opened_by, dispute.disputed_user_id].filter(Boolean);
+        let usersMap: Record<string, any> = {};
+
+        if (userIds.length > 0) {
+            const { data: users } = await supabase
+                .from('users')
+                .select('id, email')
+                .in('id', userIds);
+
+            if (users) {
+                usersMap = users.reduce((acc, u) => ({ ...acc, [u.id]: u }), {});
+            }
+        }
+
+        const disputeWithUsers = {
+            ...dispute,
+            opened_by_user: usersMap[dispute.opened_by] || { id: dispute.opened_by, email: 'unknown' },
+            disputed_user: usersMap[dispute.disputed_user_id] || { id: dispute.disputed_user_id, email: 'unknown' },
+        };
 
         const { data: messages, error: messagesError } = await supabase
             .from('dispute_messages')
@@ -56,7 +100,7 @@ export async function getDisputeDetails(disputeId: string): Promise<DisputeWithD
         if (messagesError) throw messagesError;
 
         return {
-            ...dispute,
+            ...disputeWithUsers,
             messages: messages || [],
         } as DisputeWithDetails;
     } catch (error) {

@@ -1,14 +1,5 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import Stripe from 'https://esm.sh/stripe@13.6.0?target=deno';
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
-
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
-    apiVersion: '2023-10-16',
-    httpClient: Stripe.createFetchHttpClient(),
-});
-
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -22,6 +13,15 @@ serve(async (req) => {
     }
 
     try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY')!;
+        const appUrl = Deno.env.get('APP_URL') || 'http://localhost:5173';
+
+        if (!stripeSecretKey) {
+            throw new Error('STRIPE_SECRET_KEY não configurada');
+        }
+
         // Autenticar usuário
         const authHeader = req.headers.get('Authorization');
         if (!authHeader) {
@@ -48,29 +48,29 @@ serve(async (req) => {
             .from('subscription_plans')
             .select('*')
             .eq('name', plan_name)
-            .eq('is_active', true)
             .single();
 
         if (planError || !plan) {
             throw new Error('Plano não encontrado');
         }
 
+        if (!plan.stripe_price_id) {
+            throw new Error('Plano sem Price ID configurado');
+        }
+
         // Verificar se usuário já tem assinatura ativa
-        // Usando user_subscriptions em vez de editor_subscriptions
         const { data: existingSub } = await supabase
             .from('user_subscriptions')
             .select('*')
             .eq('user_id', user.id)
             .eq('status', 'active')
-            .single();
+            .maybeSingle();
 
         if (existingSub) {
-            // Se já tem assinatura ativa, talvez queira fazer upgrade/downgrade (Customer Portal)
-            // Por enquanto, bloqueamos nova assinatura direta
             throw new Error('Você já possui uma assinatura ativa');
         }
 
-        // Buscar ou criar Stripe Customer
+        // Buscar ou criar Stripe Customer usando fetch direto
         let customerId: string;
 
         const { data: existingCustomerData } = await supabase
@@ -79,51 +79,64 @@ serve(async (req) => {
             .eq('user_id', user.id)
             .not('stripe_customer_id', 'is', null)
             .limit(1)
-            .maybeSingle(); // maybeSingle evita erro se não encontrar
+            .maybeSingle();
 
         if (existingCustomerData?.stripe_customer_id) {
             customerId = existingCustomerData.stripe_customer_id;
         } else {
-            // Criar novo customer no Stripe
-            const customer = await stripe.customers.create({
-                email: user.email,
-                metadata: {
-                    user_id: user.id,
-                    user_type: 'editor', // Assumindo que apenas editores assinam por enquanto
+            // Criar novo customer no Stripe via API direta
+            const customerResponse = await fetch('https://api.stripe.com/v1/customers', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${stripeSecretKey}`,
+                    'Content-Type': 'application/x-www-form-urlencoded',
                 },
+                body: new URLSearchParams({
+                    'email': user.email || '',
+                    'metadata[user_id]': user.id,
+                    'metadata[user_type]': 'editor',
+                }),
             });
+
+            if (!customerResponse.ok) {
+                const errorData = await customerResponse.json();
+                throw new Error(`Erro ao criar customer: ${errorData.error?.message || 'Erro desconhecido'}`);
+            }
+
+            const customer = await customerResponse.json();
             customerId = customer.id;
         }
 
-        // URL base do app (fallback para localhost se não configurado)
-        const appUrl = Deno.env.get('APP_URL') || 'http://localhost:5173';
-
-        // Criar Checkout Session para assinatura
-        const session = await stripe.checkout.sessions.create({
-            customer: customerId,
-            mode: 'subscription',
-            payment_method_types: ['card'],
-            line_items: [
-                {
-                    price: plan.stripe_price_id,
-                    quantity: 1,
-                },
-            ],
-            success_url: `${appUrl}/editor/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${appUrl}/editor/pricing`, // Ajustado para página de preços
-            metadata: {
-                user_id: user.id,
-                plan_id: plan.id,
-                plan_name: plan.name,
+        // Criar Checkout Session via API direta
+        const sessionResponse = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${stripeSecretKey}`,
+                'Content-Type': 'application/x-www-form-urlencoded',
             },
-            subscription_data: {
-                metadata: {
-                    user_id: user.id,
-                    plan_id: plan.id,
-                    plan_name: plan.name,
-                },
-            },
+            body: new URLSearchParams({
+                'customer': customerId,
+                'mode': 'subscription',
+                'payment_method_types[0]': 'card',
+                'line_items[0][price]': plan.stripe_price_id,
+                'line_items[0][quantity]': '1',
+                'success_url': `${appUrl}/editor/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+                'cancel_url': `${appUrl}/editor/subscription/plans`,
+                'metadata[user_id]': user.id,
+                'metadata[plan_id]': plan.id,
+                'metadata[plan_name]': plan.name,
+                'subscription_data[metadata][user_id]': user.id,
+                'subscription_data[metadata][plan_id]': plan.id,
+                'subscription_data[metadata][plan_name]': plan.name,
+            }),
         });
+
+        if (!sessionResponse.ok) {
+            const errorData = await sessionResponse.json();
+            throw new Error(`Erro ao criar checkout: ${errorData.error?.message || 'Erro desconhecido'}`);
+        }
+
+        const session = await sessionResponse.json();
 
         return new Response(
             JSON.stringify({

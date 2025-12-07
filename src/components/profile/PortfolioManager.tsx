@@ -12,7 +12,26 @@ import {
     Play,
     Loader2,
     GripVertical,
+    Pencil,
 } from 'lucide-react';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 interface Video {
     id: string;
@@ -48,6 +67,9 @@ function PortfolioManager({ userId }: PortfolioManagerProps) {
         description: '',
     });
 
+    const [deleteVideoId, setDeleteVideoId] = useState<string | null>(null);
+    const [editingVideo, setEditingVideo] = useState<Video | null>(null);
+
     useEffect(() => {
         if (userId) {
             loadVideos();
@@ -72,33 +94,60 @@ function PortfolioManager({ userId }: PortfolioManagerProps) {
         }
     }
 
-    async function handleAddVideo(e: React.FormEvent) {
-        e.preventDefault();
+    async function handleAddVideo() {
 
+        // === DEBUG LOGS ===
+        console.log('========== DEBUG: handleAddVideo ==========');
+        console.log('userId prop:', userId);
+        console.log('newVideo state:', JSON.stringify(newVideo, null, 2));
+        console.log('videos.length:', videos.length);
+        // ==================
+
+        // Validar limite de vídeos
         if (videos.length >= 3) {
             toast({
                 variant: 'destructive',
+                title: 'Limite atingido',
+                description: 'Você pode ter no máximo 3 vídeos no portfólio. Remova um para adicionar outro.',
+            });
+            return;
+        }
+
+        if (!userId) {
+            toast({
+                variant: 'destructive',
                 title: 'Erro',
-                description: 'Máximo de 3 vídeos no portfólio',
+                description: 'Usuário não identificado. Tente recarregar a página.',
             });
             return;
         }
 
         // Validar URL
-        if (!newVideo.url.trim()) {
+        const url = newVideo.url.trim();
+        if (!url) {
             toast({
                 variant: 'destructive',
-                title: 'Erro',
-                description: 'URL do vídeo é obrigatória',
+                title: 'URL obrigatória',
+                description: 'Por favor, insira a URL do vídeo.',
             });
             return;
         }
 
-        if (!newVideo.url.match(/^https?:\/\/.+/)) {
+        // Validar formato da URL (aceitar YouTube, Vimeo, Google Drive)
+        const validUrlPatterns = [
+            /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/.+/i,
+            /^https?:\/\/(www\.)?vimeo\.com\/.+/i,
+            /^https?:\/\/drive\.google\.com\/.+/i,
+            /^https?:\/\/.+\.(mp4|mov|avi|webm)/i, // URLs diretas de vídeo
+        ];
+
+        const isValidUrl = validUrlPatterns.some(pattern => pattern.test(url));
+
+        if (!isValidUrl) {
             toast({
                 variant: 'destructive',
-                title: 'Erro',
-                description: 'URL inválida',
+                title: 'URL inválida',
+                description: 'Por favor, use uma URL válida do YouTube, Vimeo ou Google Drive.',
             });
             return;
         }
@@ -107,21 +156,46 @@ function PortfolioManager({ userId }: PortfolioManagerProps) {
 
         try {
             const nextPosition = videos.length + 1;
+            const title = newVideo.title.trim() || `Vídeo ${nextPosition}`;
 
-            const { error } = await supabase.from('portfolio_videos').insert({
+            const insertData = {
                 editor_id: userId,
-                video_url: newVideo.url.trim(),
+                video_url: url,
                 video_type: newVideo.type,
-                title: newVideo.title.trim() || 'Vídeo ' + nextPosition,
+                title: title,
                 description: newVideo.description.trim() || null,
                 order_position: nextPosition,
-            });
+            };
+
+            // === DEBUG LOG ===
+            console.log('Dados para insert:', JSON.stringify(insertData, null, 2));
+            // =================
+
+            const { data, error } = await supabase
+                .from('portfolio_videos')
+                .insert(insertData)
+                .select()
+                .single();
+
+            // === DEBUG LOGS ===
+            console.log('Resposta do Supabase:');
+            console.log('- data:', data);
+            console.log('- error:', error);
+            if (error) {
+                console.error('ERRO DETALHADO:', {
+                    code: error.code,
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                });
+            }
+            // ==================
 
             if (error) throw error;
 
             toast({
-                title: 'Sucesso',
-                description: 'Vídeo adicionado ao portfólio!',
+                title: 'Sucesso!',
+                description: 'Vídeo adicionado ao portfólio.',
             });
 
             // Reset form
@@ -136,36 +210,45 @@ function PortfolioManager({ userId }: PortfolioManagerProps) {
             // Reload videos
             loadVideos();
         } catch (error: any) {
-            console.error('Error adding video:', error);
+            console.error('CATCH ERROR:', error);
+
+            let errorMessage = 'Erro ao adicionar vídeo. Tente novamente.';
+
+            if (error.code === '23505') {
+                errorMessage = 'Este vídeo já está no seu portfólio.';
+            } else if (error.code === '42501') {
+                errorMessage = 'Você não tem permissão para adicionar vídeos.';
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+
             toast({
                 variant: 'destructive',
                 title: 'Erro',
-                description: error.message || 'Erro ao adicionar vídeo',
+                description: errorMessage,
             });
         } finally {
             setSaving(false);
         }
     }
 
-    async function handleDeleteVideo(videoId: string) {
-        // In a real app, use a custom dialog. For now, window.confirm is fine as per user code.
-        if (!window.confirm('Tem certeza que deseja remover este vídeo?')) {
-            return;
-        }
+    async function handleDeleteVideo() {
+        if (!deleteVideoId) return;
 
         try {
             const { error } = await supabase
                 .from('portfolio_videos')
                 .delete()
-                .eq('id', videoId);
+                .eq('id', deleteVideoId);
 
             if (error) throw error;
 
             toast({
                 title: 'Sucesso',
-                description: 'Vídeo removido',
+                description: 'Vídeo removido do portfólio',
             });
 
+            setDeleteVideoId(null);
             loadVideos();
         } catch (error) {
             console.error('Error deleting video:', error);
@@ -174,6 +257,43 @@ function PortfolioManager({ userId }: PortfolioManagerProps) {
                 title: 'Erro',
                 description: 'Erro ao remover vídeo',
             });
+        }
+    }
+
+    async function handleEditVideo() {
+
+        if (!editingVideo) return;
+
+        setSaving(true);
+
+        try {
+            const { error } = await supabase
+                .from('portfolio_videos')
+                .update({
+                    title: editingVideo.title,
+                    description: editingVideo.description || null,
+                    video_type: editingVideo.video_type,
+                })
+                .eq('id', editingVideo.id);
+
+            if (error) throw error;
+
+            toast({
+                title: 'Sucesso',
+                description: 'Vídeo atualizado!',
+            });
+
+            setEditingVideo(null);
+            loadVideos();
+        } catch (error: any) {
+            console.error('Error updating video:', error);
+            toast({
+                variant: 'destructive',
+                title: 'Erro',
+                description: error.message || 'Erro ao atualizar vídeo',
+            });
+        } finally {
+            setSaving(false);
         }
     }
 
@@ -236,16 +356,37 @@ function PortfolioManager({ userId }: PortfolioManagerProps) {
                                 </div>
                             </div>
 
-                            {/* Delete Button */}
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteVideo(video.id)}
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                                {/* Botão Editar */}
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setEditingVideo(video);
+                                    }}
+                                >
+                                    <Pencil className="w-4 h-4" />
+                                </Button>
+
+                                {/* Botão Deletar */}
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setDeleteVideoId(video.id);
+                                    }}
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -265,7 +406,7 @@ function PortfolioManager({ userId }: PortfolioManagerProps) {
                             Adicionar Vídeo ({videos.length}/3)
                         </Button>
                     ) : (
-                        <form onSubmit={handleAddVideo} className="border border-primary rounded-lg p-4 bg-accent/10">
+                        <div className="border border-primary rounded-lg p-4 bg-accent/10">
                             <h4 className="font-semibold text-foreground mb-4">
                                 Novo Vídeo
                             </h4>
@@ -346,7 +487,8 @@ function PortfolioManager({ userId }: PortfolioManagerProps) {
                                 {/* Actions */}
                                 <div className="flex gap-3">
                                     <Button
-                                        type="submit"
+                                        type="button"
+                                        onClick={handleAddVideo}
                                         className="flex-1"
                                         disabled={saving}
                                     >
@@ -374,7 +516,7 @@ function PortfolioManager({ userId }: PortfolioManagerProps) {
                                     </Button>
                                 </div>
                             </div>
-                        </form>
+                        </div>
                     )}
                 </>
             )}
@@ -384,6 +526,111 @@ function PortfolioManager({ userId }: PortfolioManagerProps) {
                     Limite de 3 vídeos atingido. Remova um para adicionar outro.
                 </p>
             )}
+
+            {/* Dialog de Confirmação de Delete */}
+            <AlertDialog open={!!deleteVideoId} onOpenChange={(open) => !open && setDeleteVideoId(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Remover vídeo</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Tem certeza que deseja remover este vídeo do seu portfólio?
+                            Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteVideo}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Remover
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Dialog de Edição */}
+            <Dialog open={!!editingVideo} onOpenChange={(open) => !open && setEditingVideo(null)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Editar Vídeo</DialogTitle>
+                    </DialogHeader>
+
+                    {editingVideo && (
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">URL do Vídeo</label>
+                                <Input
+                                    value={editingVideo.video_url}
+                                    disabled
+                                    className="bg-muted"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    A URL não pode ser alterada. Delete e adicione um novo vídeo se necessário.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Tipo *</label>
+                                <Select
+                                    value={editingVideo.video_type}
+                                    onValueChange={(value) => setEditingVideo({ ...editingVideo, video_type: value })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {VIDEO_TYPES.map((type) => (
+                                            <SelectItem key={type.value} value={type.value}>
+                                                {type.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Título</label>
+                                <Input
+                                    value={editingVideo.title}
+                                    onChange={(e) => setEditingVideo({ ...editingVideo, title: e.target.value })}
+                                    placeholder="Título do vídeo"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Descrição (opcional)</label>
+                                <Textarea
+                                    value={editingVideo.description || ''}
+                                    onChange={(e) => setEditingVideo({ ...editingVideo, description: e.target.value })}
+                                    placeholder="Breve descrição do trabalho..."
+                                    rows={3}
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-4">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setEditingVideo(null)}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button type="button" onClick={handleEditVideo} disabled={saving}>
+                                    {saving ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                            Salvando...
+                                        </>
+                                    ) : (
+                                        'Salvar'
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

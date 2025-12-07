@@ -199,6 +199,8 @@ function EditProfile() {
             return;
         }
 
+        // ... validations ...
+
         if (!user) {
             toast({
                 variant: 'destructive',
@@ -209,9 +211,23 @@ function EditProfile() {
         }
 
         setSaving(true);
+        console.log('=== DEBUG: handleSave iniciado ===');
+        console.log('User ID:', user.id);
+        console.log('Profile ID:', profileId);
+        console.log('Data to save:', {
+            fullName,
+            username,
+            profilePhoto,
+            bio,
+            city,
+            state,
+            specialties: selectedSpecialties,
+            software_skills: selectedSoftwares
+        });
 
         try {
             // 1. Atualizar users table
+            console.log('=== DEBUG: Updating users table ===');
             const { error: userError } = await supabase
                 .from('users')
                 .update({
@@ -222,11 +238,13 @@ function EditProfile() {
                 .eq('id', user.id);
 
             if (userError) {
+                console.error('=== DEBUG: Error updating users table ===', userError);
                 if (userError.code === '23505') {
                     throw new Error('Username já está em uso');
                 }
                 throw userError;
             }
+            console.log('=== DEBUG: Users table updated successfully ===');
 
             // 2. Atualizar ou Criar editor_profiles
             const commonData = {
@@ -241,6 +259,7 @@ function EditProfile() {
 
             // Se já carregamos um perfil anteriormente, ou se o usuário já tem um ID de perfil
             if (profileId) {
+                console.log('=== DEBUG: Updating existing editor_profile ===');
                 // UPDATE: Usar user_id como filtro é mais seguro para RLS
                 const { error } = await supabase
                     .from('editor_profiles')
@@ -249,6 +268,7 @@ function EditProfile() {
 
                 profileError = error;
             } else {
+                console.log('=== DEBUG: Trying update on editor_profile (fallback) ===');
                 // Tentar UPDATE primeiro (caso o profileId tenha se perdido mas o perfil exista)
                 const { data: updated, error: updateError } = await supabase
                     .from('editor_profiles')
@@ -257,11 +277,14 @@ function EditProfile() {
                     .select();
 
                 if (updateError) {
+                    console.error('=== DEBUG: Fallback update failed ===', updateError);
                     profileError = updateError;
                 } else if (updated && updated.length > 0) {
+                    console.log('=== DEBUG: Fallback update succeeded ===', updated);
                     // Update funcionou
                     profileError = null;
                 } else {
+                    console.log('=== DEBUG: Fallback update returned no rows, trying INSERT ===');
                     // Se update não afetou nenhuma linha, tentar INSERT
                     const { error: insertError } = await supabase
                         .from('editor_profiles')
@@ -273,7 +296,11 @@ function EditProfile() {
                 }
             }
 
-            if (profileError) throw profileError;
+            if (profileError) {
+                console.error('=== DEBUG: Error saving editor_profile ===', profileError);
+                throw profileError;
+            }
+            console.log('=== DEBUG: editor_profile saved successfully ===');
 
             toast({
                 title: 'Sucesso!',

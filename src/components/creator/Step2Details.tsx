@@ -24,9 +24,10 @@ interface Step2DetailsProps {
     onChange: (updates: Partial<ProjectData>) => void;
     onBack: () => void;
     onSubmit: () => void;
+    submitLabel?: string;
 }
 
-export function Step2Details({ data, onChange, onBack, onSubmit }: Step2DetailsProps) {
+export function Step2Details({ data, onChange, onBack, onSubmit, submitLabel = 'Ir para Pagamento →' }: Step2DetailsProps) {
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const isValidUrl = (url: string): boolean => {
@@ -220,7 +221,7 @@ export function Step2Details({ data, onChange, onBack, onSubmit }: Step2DetailsP
                     onClick={handleSubmit}
                     size="lg"
                 >
-                    Ir para Pagamento →
+                    {submitLabel}
                 </Button>
             </div>
         </div>

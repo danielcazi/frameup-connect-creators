@@ -13,7 +13,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Create a mock client if credentials are missing to prevent errors
 const createSupabaseClient = () => {
   if (supabaseUrl && supabaseAnonKey) {
-    return createClient(supabaseUrl, supabaseAnonKey);
+    return createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+    });
   }
 
   // Return a mock client with no-op methods

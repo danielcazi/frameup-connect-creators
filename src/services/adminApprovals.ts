@@ -2,20 +2,14 @@ import { supabase } from '@/lib/supabase';
 import { EditorApprovalQueue, EditorApprovalDetails } from '@/types/admin';
 
 // Buscar fila de aprovações pendentes
+// Buscar fila de aprovações pendentes
 export async function getApprovalQueue(
     status: 'pending' | 'approved' | 'rejected' | 'all' = 'pending'
 ) {
     try {
         let query = supabase
             .from('editor_approval_queue')
-            .select(`
-        *,
-        editor:users!editor_id (
-          id,
-          email,
-          full_name
-        )
-      `)
+            .select('*')
             .order('submitted_at', { ascending: true });
 
         if (status !== 'all') {
@@ -25,7 +19,31 @@ export async function getApprovalQueue(
         const { data, error } = await query;
 
         if (error) throw error;
-        return data as EditorApprovalQueue[];
+
+        // Manual fetch for editor details
+        const editorIds = Array.from(new Set(data?.map(item => item.editor_id) || []));
+        let editorsMap: Record<string, any> = {};
+
+        if (editorIds.length > 0) {
+            const { data: usersData } = await supabase
+                .from('users')
+                .select('id, email, full_name')
+                .in('id', editorIds);
+
+            if (usersData) {
+                editorsMap = usersData.reduce((acc, user) => {
+                    acc[user.id] = user;
+                    return acc;
+                }, {} as Record<string, any>);
+            }
+        }
+
+        const queueWithEditors = data?.map(item => ({
+            ...item,
+            editor: editorsMap[item.editor_id] || { id: item.editor_id, email: '', full_name: 'Desconhecido' }
+        }));
+
+        return queueWithEditors as EditorApprovalQueue[];
     } catch (error) {
         console.error('Erro ao buscar fila de aprovação:', error);
         throw error;

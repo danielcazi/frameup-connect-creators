@@ -255,7 +255,8 @@ const Signup = () => {
         if (data.userType === 'creator') {
           navigate('/creator/dashboard');
         } else {
-          navigate('/editor/pricing');
+          // Editor vai direto para o dashboard - assinatura é opcional para começar
+          navigate('/editor/dashboard');
         }
       }, 1500);
 

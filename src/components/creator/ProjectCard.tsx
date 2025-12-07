@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
+import { canEditProject, getProjectStatusLabel } from '@/lib/projects';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -9,6 +10,8 @@ import {
   Eye,
   MessageSquare,
   AlertCircle,
+  PlayCircle,
+  Edit,
 } from 'lucide-react';
 
 interface Project {
@@ -22,6 +25,7 @@ interface Project {
     applications: number;
   };
   has_reviewed?: boolean;
+  assigned_editor_id?: string;
 }
 
 function CreatorProjectCard({ project }: { project: Project }) {
@@ -30,23 +34,20 @@ function CreatorProjectCard({ project }: { project: Project }) {
   const applicationCount = project._count?.applications || 0;
   const hasApplications = applicationCount > 0;
 
-  function getStatusBadge(status: string) {
-    switch (status) {
-      case 'draft':
-        return <Badge variant="secondary">Rascunho</Badge>;
-      case 'open':
-        return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">Aberto</Badge>;
-      case 'in_progress':
-        return <Badge variant="default">Em Andamento</Badge>;
-      case 'in_review':
-        return <Badge className="bg-blue-500 hover:bg-blue-600 text-white">Em Revisão</Badge>;
-      case 'completed':
-        return <Badge className="bg-green-500 hover:bg-green-600 text-white">Concluído</Badge>;
-      case 'cancelled':
-        return <Badge variant="destructive">Cancelado</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
+  function getStatusBadge(project: Project) {
+    const statusLabel = getProjectStatusLabel(project);
+    const status = project.status;
+    const hasEditor = !!project.assigned_editor_id;
+
+    // Custom styles based on the *computed* status or raw status
+    if (status === 'draft') return <Badge variant="secondary">{statusLabel}</Badge>;
+    if (status === 'open' || (status === 'published' && !hasEditor)) return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">{statusLabel}</Badge>;
+    if (status === 'in_progress' || (status === 'published' && hasEditor)) return <Badge variant="default">{statusLabel}</Badge>;
+    if (status === 'in_review') return <Badge className="bg-blue-500 hover:bg-blue-600 text-white">{statusLabel}</Badge>;
+    if (status === 'completed') return <Badge className="bg-green-500 hover:bg-green-600 text-white">{statusLabel}</Badge>;
+    if (status === 'cancelled') return <Badge variant="destructive">{statusLabel}</Badge>;
+
+    return <Badge variant="secondary">{statusLabel}</Badge>;
   }
 
   return (
@@ -57,7 +58,7 @@ function CreatorProjectCard({ project }: { project: Project }) {
           {project.title}
         </h3>
         <div className="flex flex-col items-end gap-2">
-          {getStatusBadge(project.status)}
+          {getStatusBadge(project)}
           {project.status === 'completed' && !project.has_reviewed && (
             <Badge variant="outline" className="border-yellow-500 text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-700 text-xs whitespace-nowrap">
               Avaliar Pendente
@@ -132,6 +133,15 @@ function CreatorProjectCard({ project }: { project: Project }) {
             <MessageSquare className="w-4 h-4 mr-2" />
             Abrir Chat
           </Button>
+        ) : ['in_review', 'revision_requested'].includes(project.status) ? (
+          <Button
+            className="w-full"
+            onClick={() => navigate(`/creator/project/${project.id}/review`)}
+            variant={project.status === 'in_review' ? 'default' : 'secondary'}
+          >
+            <PlayCircle className="w-4 h-4 mr-2" />
+            {project.status === 'in_review' ? 'Revisar Entrega' : 'Ver Revisão'}
+          </Button>
         ) : (
           <Button
             variant="secondary"
@@ -140,6 +150,18 @@ function CreatorProjectCard({ project }: { project: Project }) {
           >
             <Eye className="w-4 h-4 mr-2" />
             Ver Detalhes
+          </Button>
+        )}
+
+        {/* Edit Button - only if draft/open/published AND no editor assigned */}
+        {canEditProject(project) && project.status !== 'draft' && (
+          <Button
+            variant="outline"
+            className="w-full" // ou w-auto dependendo do layout desejado, mas aqui parece coluna única ou flex row
+            onClick={() => navigate(`/creator/project/${project.id}/edit`)}
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            Editar
           </Button>
         )}
       </div>
