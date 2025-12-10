@@ -170,7 +170,7 @@ export default function AdminLayout() {
 
             {/* Main Content */}
             <main
-                className={`flex-1 ${sidebarOpen ? 'ml-64' : 'ml-20'
+                className={`flex-1 min-w-0 ${sidebarOpen ? 'ml-64' : 'ml-20'
                     } transition-all duration-300`}
             >
                 <Outlet />

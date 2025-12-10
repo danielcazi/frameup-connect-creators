@@ -82,7 +82,7 @@ const CreatorEditors = () => {
     };
 
     const handleViewProfile = (username: string) => {
-        navigate(`/editor/@${username}`);
+        navigate(`/editor/profile/${username}`);
     };
 
     if (authLoading) {

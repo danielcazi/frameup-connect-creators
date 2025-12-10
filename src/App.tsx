@@ -48,6 +48,7 @@ import Discounts from "./pages/admin/Discounts";
 import SuspiciousUsers from "./pages/admin/SuspiciousUsers";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminProjects from "./pages/admin/AdminProjects";
+import AdminProjectDetails from "./pages/admin/AdminProjectDetails";
 import Analytics from "./pages/admin/Analytics";
 import Notifications from "./pages/shared/Notifications";
 import Favorites from "./pages/creator/Favorites";
@@ -58,6 +59,8 @@ import EditorProposals from "./pages/editor/Proposals";
 import DeliverVideo from "./pages/editor/DeliverVideo";
 import ReviewDelivery from "./pages/creator/ReviewDelivery";
 import RevisionView from "./pages/shared/RevisionView";
+import NotificationPreferences from '@/pages/shared/NotificationPreferences';
+import UserDetails from "./pages/admin/UserDetails";
 
 const queryClient = new QueryClient();
 
@@ -206,6 +209,14 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/creator/notifications/preferences"
+                element={
+                  <ProtectedRoute requiredUserType="creator">
+                    <NotificationPreferences />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Editor Protected Routes */}
               <Route
@@ -301,14 +312,7 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/editor/@:username"
-                element={
-                  <ProtectedRoute>
-                    <EditorPublicProfile />
-                  </ProtectedRoute>
-                }
-              />
+
               <Route
                 path="/editor/profile/:username"
                 element={
@@ -360,6 +364,14 @@ const App = () => (
                 }
               />
               <Route
+                path="/editor/notifications/preferences"
+                element={
+                  <ProtectedRoute requiredUserType="editor">
+                    <NotificationPreferences />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/editor/proposals"
                 element={
                   <ProtectedRoute requiredUserType="editor">
@@ -380,7 +392,9 @@ const App = () => (
                 <Route path="discounts" element={<Discounts />} />
                 <Route path="suspicious-users" element={<SuspiciousUsers />} />
                 <Route path="users" element={<AdminUsers />} />
+                <Route path="users/:userId" element={<UserDetails />} />
                 <Route path="projects" element={<AdminProjects />} />
+                <Route path="projects/:id" element={<AdminProjectDetails />} />
                 <Route path="analytics" element={<Analytics />} />
               </Route>
 

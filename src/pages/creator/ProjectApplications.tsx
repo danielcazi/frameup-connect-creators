@@ -23,6 +23,17 @@ import {
     AlertCircle,
 } from 'lucide-react';
 
+interface EditorProfile {
+    bio: string;
+    city: string;
+    state: string;
+    specialties: string[];
+    software_skills: string[];
+    rating_average: number;
+    total_projects: number;
+    total_reviews: number;
+}
+
 interface Application {
     id: string;
     message: string;
@@ -33,16 +44,7 @@ interface Application {
         full_name: string;
         username: string;
         profile_photo_url?: string;
-        editor_profiles: {
-            bio: string;
-            city: string;
-            state: string;
-            specialties: string[];
-            software_skills: string[];
-            rating_average: number;
-            total_projects: number;
-            total_reviews: number;
-        };
+        editor_profiles: EditorProfile | EditorProfile[] | null;
     };
 }
 
@@ -65,6 +67,15 @@ import {
 } from '@/components/ui/alert-dialog';
 
 function ProjectApplications() {
+    // Helper para extrair editor_profiles (pode vir como array ou objeto do Supabase)
+    function getEditorProfile(profiles: EditorProfile | EditorProfile[] | null | undefined): EditorProfile | null {
+        if (!profiles) return null;
+        if (Array.isArray(profiles)) {
+            return profiles.length > 0 ? profiles[0] : null;
+        }
+        return profiles;
+    }
+
     const { id } = useParams();
     const { user } = useAuth();
     const { toast } = useToast();
@@ -394,16 +405,23 @@ function ProjectApplications() {
                                         @{acceptedApplication.editor.username}
                                     </p>
                                     <div className="flex items-center gap-2 mt-1">
-                                        <div className="flex items-center gap-1">
-                                            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                                            <span className="text-sm font-medium">
-                                                {acceptedApplication.editor.editor_profiles?.rating_average?.toFixed(1) || '0.0'}
-                                            </span>
-                                        </div>
-                                        <span className="text-muted-foreground">•</span>
-                                        <span className="text-sm text-muted-foreground">
-                                            {acceptedApplication.editor.editor_profiles?.total_projects || 0} projetos
-                                        </span>
+                                        {(() => {
+                                            const profile = getEditorProfile(acceptedApplication.editor.editor_profiles);
+                                            return (
+                                                <>
+                                                    <div className="flex items-center gap-1">
+                                                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                                        <span className="text-sm font-medium">
+                                                            {profile?.rating_average?.toFixed(1) || '0.0'}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-muted-foreground">•</span>
+                                                    <span className="text-sm text-muted-foreground">
+                                                        {profile?.total_projects || 0} projetos
+                                                    </span>
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </div>
@@ -452,36 +470,46 @@ function ProjectApplications() {
                                             </div>
 
                                             {/* Stats */}
-                                            <div className="flex flex-wrap items-center gap-4 mb-3">
-                                                <div className="flex items-center gap-1.5">
-                                                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                                                    <span className="text-sm font-medium">
-                                                        {application.editor.editor_profiles?.rating_average?.toFixed(1) || '0.0'}
-                                                    </span>
-                                                    <span className="text-sm text-muted-foreground">
-                                                        ({application.editor.editor_profiles?.total_reviews || 0} avaliações)
-                                                    </span>
-                                                </div>
+                                            {(() => {
+                                                const profile = getEditorProfile(application.editor.editor_profiles);
+                                                return (
+                                                    <div className="flex flex-wrap items-center gap-4 mb-3">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                                            <span className="text-sm font-medium">
+                                                                {profile?.rating_average?.toFixed(1) || '0.0'}
+                                                            </span>
+                                                            <span className="text-sm text-muted-foreground">
+                                                                ({profile?.total_reviews || 0} avaliações)
+                                                            </span>
+                                                        </div>
 
-                                                <div className="flex items-center gap-1.5 text-muted-foreground">
-                                                    <Briefcase className="w-4 h-4" />
-                                                    <span className="text-sm">
-                                                        {application.editor.editor_profiles?.total_projects || 0} projetos concluídos
-                                                    </span>
-                                                </div>
-                                            </div>
+                                                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                                                            <Briefcase className="w-4 h-4" />
+                                                            <span className="text-sm">
+                                                                {profile?.total_projects || 0} projetos concluídos
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
 
                                             {/* Location & Specialties */}
-                                            <div className="flex flex-wrap gap-2 mb-3">
-                                                <Badge variant="secondary">
-                                                    {application.editor.editor_profiles?.city || 'N/A'}, {application.editor.editor_profiles?.state || ''}
-                                                </Badge>
-                                                {application.editor.editor_profiles?.specialties?.slice(0, 3).map((specialty) => (
-                                                    <Badge key={specialty} variant="default">
-                                                        {specialty}
-                                                    </Badge>
-                                                ))}
-                                            </div>
+                                            {(() => {
+                                                const profile = getEditorProfile(application.editor.editor_profiles);
+                                                return (
+                                                    <div className="flex flex-wrap gap-2 mb-3">
+                                                        <Badge variant="secondary">
+                                                            {profile?.city || 'N/A'}, {profile?.state || ''}
+                                                        </Badge>
+                                                        {profile?.specialties?.slice(0, 3).map((specialty) => (
+                                                            <Badge key={specialty} variant="default">
+                                                                {specialty}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            })()}
 
                                             {/* Message */}
                                             <div className="bg-muted/50 rounded-lg p-4 mb-4 border">

@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search, Filter, LayoutGrid, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProjectCard from '@/components/creator/ProjectCard';
+import ProjectKanban from '@/components/creator/ProjectKanban';
 import EmptyState from '@/components/common/EmptyState';
 import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -24,12 +26,16 @@ interface Project {
     _count?: {
         applications: number;
     };
+    has_reviewed?: boolean;
+    assigned_editor_id?: string;
     assigned_editor?: {
         full_name: string;
         username: string;
         profile_photo_url?: string;
     };
 }
+
+type ViewMode = 'list' | 'kanban';
 
 const CreatorProjects = () => {
     const navigate = useNavigate();
@@ -40,6 +46,7 @@ const CreatorProjects = () => {
     const [statusFilter, setStatusFilter] = useState('all');
     const [sortBy, setSortBy] = useState('recent');
     const [searchTerm, setSearchTerm] = useState('');
+    const [viewMode, setViewMode] = useState<ViewMode>('list');
     const debouncedSearch = useDebounce(searchTerm, 500);
 
     useEffect(() => {
@@ -64,8 +71,8 @@ const CreatorProjects = () => {
                 .select('*')
                 .eq('creator_id', user.id);
 
-            // Apply status filter
-            if (statusFilter !== 'all') {
+            // Apply status filter (apenas no modo lista)
+            if (statusFilter !== 'all' && viewMode === 'list') {
                 query = query.eq('status', statusFilter);
             }
 
@@ -151,6 +158,14 @@ const CreatorProjects = () => {
         navigate('/creator/project/new');
     };
 
+    // Refetch quando mudar o modo de visualização
+    useEffect(() => {
+        if (user && viewMode === 'kanban') {
+            // No modo Kanban, remover filtro de status para mostrar todos
+            setStatusFilter('all');
+        }
+    }, [viewMode]);
+
     if (authLoading) {
         return (
             <div className="flex min-h-screen items-center justify-center">
@@ -175,7 +190,7 @@ const CreatorProjects = () => {
             }
         >
             {/* Filters Section */}
-            <div className="bg-white p-4 rounded-lg border border-gray-200 mb-6 space-y-4 md:space-y-0 md:flex md:items-center md:justify-between gap-4">
+            <div className="bg-white dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700 mb-6 space-y-4 md:space-y-0 md:flex md:items-center md:justify-between gap-4">
                 <div className="relative flex-1 max-w-md">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                     <Input
@@ -187,23 +202,27 @@ const CreatorProjects = () => {
                     />
                 </div>
 
-                <div className="flex gap-3 w-full md:w-auto">
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-full md:w-[180px]">
-                            <div className="flex items-center gap-2">
-                                <Filter className="h-4 w-4" />
-                                <SelectValue placeholder="Status" />
-                            </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todos os Status</SelectItem>
-                            <SelectItem value="open">Aguardando Editor</SelectItem>
-                            <SelectItem value="in_progress">Em Andamento</SelectItem>
-                            <SelectItem value="in_review">Em Revisão</SelectItem>
-                            <SelectItem value="completed">Concluídos</SelectItem>
-                            <SelectItem value="cancelled">Cancelados</SelectItem>
-                        </SelectContent>
-                    </Select>
+                <div className="flex gap-3 w-full md:w-auto items-center">
+                    {/* Filtro de Status (oculto no modo Kanban) */}
+                    {viewMode === 'list' && (
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger className="w-full md:w-[180px]">
+                                <div className="flex items-center gap-2">
+                                    <Filter className="h-4 w-4" />
+                                    <SelectValue placeholder="Status" />
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos os Status</SelectItem>
+                                <SelectItem value="draft">Rascunho</SelectItem>
+                                <SelectItem value="open">Aguardando Editor</SelectItem>
+                                <SelectItem value="in_progress">Em Andamento</SelectItem>
+                                <SelectItem value="in_review">Em Revisão</SelectItem>
+                                <SelectItem value="completed">Concluídos</SelectItem>
+                                <SelectItem value="cancelled">Cancelados</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    )}
 
                     <Select value={sortBy} onValueChange={setSortBy}>
                         <SelectTrigger className="w-full md:w-[150px]">
@@ -214,36 +233,69 @@ const CreatorProjects = () => {
                             <SelectItem value="oldest">Mais Antigo</SelectItem>
                         </SelectContent>
                     </Select>
+
+                    {/* Toggle de Visualização */}
+                    <ToggleGroup
+                        type="single"
+                        value={viewMode}
+                        onValueChange={(value) => value && setViewMode(value as ViewMode)}
+                        className="border rounded-lg p-1"
+                    >
+                        <ToggleGroupItem
+                            value="list"
+                            aria-label="Visualização em lista"
+                            className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground px-3"
+                        >
+                            <List className="h-4 w-4" />
+                        </ToggleGroupItem>
+                        <ToggleGroupItem
+                            value="kanban"
+                            aria-label="Visualização Kanban"
+                            className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground px-3"
+                        >
+                            <LayoutGrid className="h-4 w-4" />
+                        </ToggleGroupItem>
+                    </ToggleGroup>
                 </div>
             </div>
 
-            {/* Projects List */}
-            <div className="space-y-4">
-                {loading && (
-                    <>
-                        <Skeleton className="h-32 w-full" />
-                        <Skeleton className="h-32 w-full" />
-                        <Skeleton className="h-32 w-full" />
-                    </>
-                )}
+            {/* Loading State */}
+            {loading && (
+                <div className="space-y-4">
+                    <Skeleton className="h-32 w-full" />
+                    <Skeleton className="h-32 w-full" />
+                    <Skeleton className="h-32 w-full" />
+                </div>
+            )}
 
-                {!loading && projects.length === 0 && (
-                    <EmptyState
-                        illustration="projects"
-                        title={searchTerm ? "Nenhum projeto encontrado" : "Nenhum projeto ainda"}
-                        description={searchTerm ? "Tente buscar com outros termos." : "Crie seu primeiro projeto e encontre o editor perfeito para seu conteúdo."}
-                        action={!searchTerm ? {
-                            label: "Criar Primeiro Projeto",
-                            onClick: handleNewProject,
-                            variant: "default",
-                        } : undefined}
-                    />
-                )}
+            {/* Empty State */}
+            {!loading && projects.length === 0 && (
+                <EmptyState
+                    illustration="projects"
+                    title={searchTerm ? "Nenhum projeto encontrado" : "Nenhum projeto ainda"}
+                    description={searchTerm ? "Tente buscar com outros termos." : "Crie seu primeiro projeto e encontre o editor perfeito para seu conteúdo."}
+                    action={!searchTerm ? {
+                        label: "Criar Primeiro Projeto",
+                        onClick: handleNewProject,
+                        variant: "default",
+                    } : undefined}
+                />
+            )}
 
-                {!loading && projects.map(project => (
-                    <ProjectCard key={project.id} project={project} />
-                ))}
-            </div>
+            {/* Projects View */}
+            {!loading && projects.length > 0 && (
+                <>
+                    {viewMode === 'list' ? (
+                        <div className="space-y-4">
+                            {projects.map(project => (
+                                <ProjectCard key={project.id} project={project} />
+                            ))}
+                        </div>
+                    ) : (
+                        <ProjectKanban projects={projects} />
+                    )}
+                </>
+            )}
         </DashboardLayout>
     );
 };

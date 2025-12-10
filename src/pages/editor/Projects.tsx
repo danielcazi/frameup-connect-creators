@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, Briefcase, AlertCircle } from 'lucide-react';
+import { Search, Filter, Briefcase, AlertCircle, Film, ArrowUpDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/hooks/useSubscription';
 import { supabase } from '@/lib/supabase';
@@ -11,6 +11,13 @@ import EmptyState from '@/components/common/EmptyState';
 import { MarketplaceLoadingSkeleton } from '@/components/ui/LoadingSkeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/useDebounce';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 interface Project {
     id: string;
@@ -36,11 +43,16 @@ interface Project {
 interface Filters {
     videoType: string[];
     editingStyle: string[];
-    minBudget: number;
-    maxBudget: number;
     maxDeadline: number;
     search: string;
+    sortBy: string;
 }
+
+const VIDEO_TYPES = [
+    { value: 'reels', label: 'Reels/Shorts' },
+    { value: 'youtube', label: 'YouTube' },
+    { value: 'motion', label: 'Motion Design' },
+];
 
 const EditorProjects = () => {
     const { user, loading: authLoading } = useAuth();
@@ -58,10 +70,9 @@ const EditorProjects = () => {
     const [filters, setFilters] = useState<Filters>({
         videoType: [],
         editingStyle: [],
-        minBudget: 0,
-        maxBudget: 10000,
         maxDeadline: 30,
         search: '',
+        sortBy: 'newest', // newest, highest, lowest
     });
 
     const debouncedSearch = useDebounce(filters.search, 500);
@@ -195,6 +206,7 @@ const EditorProjects = () => {
     function applyFilters() {
         let filtered = [...projects];
 
+        // Search filter
         if (debouncedSearch) {
             const searchLower = debouncedSearch.toLowerCase();
             filtered = filtered.filter(
@@ -205,20 +217,29 @@ const EditorProjects = () => {
             );
         }
 
+        // Video type filter
         if (filters.videoType.length > 0) {
             filtered = filtered.filter(p => filters.videoType.includes(p.video_type));
         }
 
+        // Editing style filter
         if (filters.editingStyle.length > 0) {
             filtered = filtered.filter(p => filters.editingStyle.includes(p.editing_style));
         }
 
-        filtered = filtered.filter(
-            p => p.base_price >= filters.minBudget && p.base_price <= filters.maxBudget
-        );
-
+        // Deadline filter
         if (filters.maxDeadline < 30) {
             filtered = filtered.filter(p => p.deadline_days <= filters.maxDeadline);
+        }
+
+        // Sorting
+        if (filters.sortBy === 'highest') {
+            filtered.sort((a, b) => b.base_price - a.base_price);
+        } else if (filters.sortBy === 'lowest') {
+            filtered.sort((a, b) => a.base_price - b.base_price);
+        } else {
+            // Default: newest first
+            filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         }
 
         setFilteredProjects(filtered);
@@ -232,18 +253,23 @@ const EditorProjects = () => {
         setFilters({
             videoType: [],
             editingStyle: [],
-            minBudget: 0,
-            maxBudget: 10000,
             maxDeadline: 30,
             search: '',
+            sortBy: 'newest',
         });
+    }
+
+    function toggleVideoType(value: string) {
+        const current = filters.videoType;
+        const newValue = current.includes(value)
+            ? current.filter((v) => v !== value)
+            : [...current, value];
+        handleFilterChange({ videoType: newValue });
     }
 
     const hasActiveFilters =
         filters.videoType.length > 0 ||
         filters.editingStyle.length > 0 ||
-        filters.minBudget > 0 ||
-        filters.maxBudget < 10000 ||
         filters.maxDeadline < 30;
 
     if (authLoading || loading) {
@@ -281,7 +307,7 @@ const EditorProjects = () => {
                     </div>
                 )}
 
-                {/* Filters */}
+                {/* Barra de Pesquisa e Filtros */}
                 <div className="bg-card rounded-lg border p-4 shadow-sm">
                     <div className="flex flex-col md:flex-row gap-4">
                         <div className="flex-1 relative">
@@ -297,15 +323,17 @@ const EditorProjects = () => {
                         </div>
                         <button
                             onClick={() => setShowFilters(!showFilters)}
-                            className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${showFilters || hasActiveFilters
-                                ? 'bg-primary/10 border-primary text-primary'
-                                : 'bg-background border-input hover:bg-accent'
+                            className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors whitespace-nowrap ${showFilters || hasActiveFilters
+                                    ? 'bg-primary/10 border-primary text-primary'
+                                    : 'bg-background border-input hover:bg-accent'
                                 }`}
                         >
                             <Filter className="w-5 h-5" />
                             <span>Filtros</span>
                         </button>
                     </div>
+
+                    {/* Filtros Avançados (colapsável) */}
                     {showFilters && (
                         <ProjectFilters
                             filters={filters}
@@ -314,6 +342,58 @@ const EditorProjects = () => {
                             hasActiveFilters={hasActiveFilters}
                         />
                     )}
+                </div>
+
+                {/* Tipo de Vídeo (sempre visível) + Ordenação */}
+                <div className="bg-card rounded-lg border p-4 shadow-sm">
+                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                        {/* Tipo de Vídeo */}
+                        <div className="flex-1 w-full lg:w-auto">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Film className="w-4 h-4 text-muted-foreground" />
+                                <label className="text-sm font-medium text-foreground">
+                                    Tipo de Vídeo
+                                </label>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {VIDEO_TYPES.map((type) => (
+                                    <button
+                                        key={type.value}
+                                        onClick={() => toggleVideoType(type.value)}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filters.videoType.includes(type.value)
+                                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                                            }`}
+                                    >
+                                        {type.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Ordenação por Valor */}
+                        <div className="w-full lg:w-auto lg:min-w-[220px]">
+                            <div className="flex items-center gap-2 mb-3">
+                                <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                                <label className="text-sm font-medium text-foreground">
+                                    Ordenar por
+                                </label>
+                            </div>
+                            <Select
+                                value={filters.sortBy}
+                                onValueChange={(value) => handleFilterChange({ sortBy: value })}
+                            >
+                                <SelectTrigger className="w-full bg-background">
+                                    <SelectValue placeholder="Ordenar por..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="newest">Mais Recentes</SelectItem>
+                                    <SelectItem value="highest">Maior Valor</SelectItem>
+                                    <SelectItem value="lowest">Menor Valor</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Projects Grid */}

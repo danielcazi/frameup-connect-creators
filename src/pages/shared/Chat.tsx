@@ -47,7 +47,11 @@ interface Project {
     };
 }
 
-function Chat() {
+interface ChatProps {
+    isAdminView?: boolean;
+}
+
+function Chat({ isAdminView = false }: ChatProps) {
     const { id } = useParams(); // project_id
     const { user, userType } = useAuth();
     const { toast } = useToast();
@@ -66,7 +70,10 @@ function Chat() {
             loadProject();
             loadMessages();
             const unsubscribe = subscribeToMessages();
-            markMessagesAsRead();
+            // Admins don't mark messages as read to avoid messing up user status
+            if (!isAdminView) {
+                markMessagesAsRead();
+            }
             return unsubscribe;
         }
     }, [id, user]);
@@ -109,7 +116,7 @@ function Chat() {
             const isCreator = data.creator_id === user.id;
             const isAssignedEditor = data.assigned_editor_id === user.id;
 
-            if (!isCreator && !isAssignedEditor) {
+            if (!isAdminView && !isCreator && !isAssignedEditor) {
                 toast({
                     variant: 'destructive',
                     title: 'Acesso negado',
@@ -119,7 +126,7 @@ function Chat() {
                 return;
             }
 
-            if (data.status !== 'in_progress' && data.status !== 'in_review') {
+            if (!isAdminView && data.status !== 'in_progress' && data.status !== 'in_review') {
                 toast({
                     variant: 'destructive',
                     title: 'Chat indisponível',
@@ -137,7 +144,9 @@ function Chat() {
                 title: 'Erro',
                 description: 'Erro ao carregar projeto',
             });
-            navigate(userType === 'creator' ? '/creator/dashboard' : '/editor/dashboard');
+            if (!isAdminView) {
+                navigate(userType === 'creator' ? '/creator/dashboard' : '/editor/dashboard');
+            }
         }
     }
 
@@ -191,8 +200,8 @@ function Chat() {
                         return [...prev, newMessage];
                     });
 
-                    // Se não é a própria mensagem, marcar como lida
-                    if (newMessage.sender_id !== user.id) {
+                    // Se não é a própria mensagem e não é admin, marcar como lida
+                    if (!isAdminView && newMessage.sender_id !== user.id) {
                         markMessageAsRead(newMessage.id);
                     }
                 }
@@ -323,6 +332,15 @@ function Chat() {
     };
 
     if (loading || !project) {
+        // If loaded in admin tab, show simple loader without layout
+        if (isAdminView) {
+            return (
+                <div className="flex items-center justify-center h-full">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+            );
+        }
+
         return (
             <DashboardLayout
                 userType={userType as 'creator' | 'editor'}
@@ -336,19 +354,15 @@ function Chat() {
         );
     }
 
-    const otherUser =
-        user?.id === project.creator_id ? project.users_editor : project.users_creator;
+    const otherUser = isAdminView
+        ? null // In admin view, we see everyone's messages, no "other user" concept for header specific to one side
+        : (user?.id === project.creator_id ? project.users_editor : project.users_creator);
 
     const messageGroups = groupMessagesByDate(messages);
 
-    return (
-        <DashboardLayout
-            userType={userType as 'creator' | 'editor'}
-            title="Chat"
-            subtitle={project.title}
-        >
-            <div className="max-w-5xl mx-auto h-[calc(100vh-200px)] flex flex-col">
-                {/* Header */}
+    const ChatContent = (
+        <div className={`flex flex-col h-full ${isAdminView ? '' : 'max-w-5xl mx-auto h-[calc(100vh-200px)]'}`}>
+            {!isAdminView && (
                 <Card className="mb-4 p-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
@@ -396,65 +410,86 @@ function Chat() {
                         </div>
                     </div>
                 </Card>
+            )}
 
-                {/* Messages Container */}
-                <Card className="flex-1 flex flex-col overflow-hidden p-0">
-                    {/* Messages Area */}
-                    <div
-                        ref={messagesContainerRef}
-                        className="flex-1 overflow-y-auto p-6 space-y-6"
-                    >
-                        {messages.length === 0 ? (
-                            <div className="flex items-center justify-center h-full">
-                                <EmptyState
-                                    illustration="messages"
-                                    title="Nenhuma mensagem ainda"
-                                    description="Envie a primeira mensagem para iniciar a conversa!"
-                                />
-                            </div>
-                        ) : (
-                            Object.entries(messageGroups).map(([date, groupMessages]) => (
-                                <div key={date}>
-                                    {/* Date Separator */}
-                                    <div className="flex items-center justify-center mb-4">
-                                        <div className="bg-muted text-muted-foreground text-xs font-medium px-3 py-1 rounded-full">
-                                            {date}
-                                        </div>
+            {/* Messages Container */}
+            <Card className={`flex-1 flex flex-col overflow-hidden p-0 ${isAdminView ? 'border-0 shadow-none rounded-none' : ''}`}>
+                {/* Messages Area */}
+                <div
+                    ref={messagesContainerRef}
+                    className="flex-1 overflow-y-auto p-6 space-y-6"
+                >
+                    {messages.length === 0 ? (
+                        <div className="flex items-center justify-center h-full">
+                            <EmptyState
+                                illustration="messages"
+                                title="Nenhuma mensagem ainda"
+                                description={isAdminView ? "Não há mensagens neste projeto." : "Envie a primeira mensagem para iniciar a conversa!"}
+                            />
+                        </div>
+                    ) : (
+                        Object.entries(messageGroups).map(([date, groupMessages]) => (
+                            <div key={date}>
+                                {/* Date Separator */}
+                                <div className="flex items-center justify-center mb-4">
+                                    <div className="bg-muted text-muted-foreground text-xs font-medium px-3 py-1 rounded-full">
+                                        {date}
                                     </div>
+                                </div>
 
-                                    {/* Messages */}
-                                    <div className="space-y-3">
-                                        {groupMessages.map((message) => (
+                                {/* Messages */}
+                                <div className="space-y-3">
+                                    {groupMessages.map((message) => {
+                                        // Helper to find author details
+                                        const isCreator = message.sender_id === project.creator_id;
+                                        const author = isCreator ? project.users_creator : project.users_editor;
+                                        const isOwn = message.sender_id === user?.id; // Should be false for admin usually
+
+                                        return (
                                             <MessageBubble
                                                 key={message.id}
                                                 message={message}
-                                                isOwn={message.sender_id === user?.id}
+                                                isOwn={isOwn}
                                                 senderName={
-                                                    message.sender_id === user?.id
+                                                    isOwn
                                                         ? 'Você'
-                                                        : otherUser?.full_name || 'Usuário'
+                                                        : author?.full_name || 'Usuário'
                                                 }
                                                 senderAvatar={
-                                                    message.sender_id === user?.id
-                                                        ? user.user_metadata?.profile_photo_url
-                                                        : otherUser?.profile_photo_url
+                                                    author?.profile_photo_url
                                                 }
                                             />
-                                        ))}
-                                    </div>
+                                        );
+                                    })}
                                 </div>
-                            ))
-                        )}
+                            </div>
+                        ))
+                    )}
 
-                        <div ref={messagesEndRef} />
-                    </div>
+                    <div ref={messagesEndRef} />
+                </div>
 
-                    {/* Message Input */}
+                {/* Message Input - Hide if Admin */}
+                {!isAdminView && (
                     <div className="border-t border-border p-4 bg-card">
                         <MessageInput onSend={handleSendMessage} disabled={sending} />
                     </div>
-                </Card>
-            </div>
+                )}
+            </Card>
+        </div>
+    );
+
+    if (isAdminView) {
+        return ChatContent;
+    }
+
+    return (
+        <DashboardLayout
+            userType={userType as 'creator' | 'editor'}
+            title="Chat"
+            subtitle={project.title}
+        >
+            {ChatContent}
         </DashboardLayout>
     );
 }

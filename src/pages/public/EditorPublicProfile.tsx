@@ -23,7 +23,16 @@ import {
 } from 'lucide-react';
 import FavoriteButton from '@/components/favorites/FavoriteButton';
 
-interface EditorProfile {
+interface PortfolioVideo {
+    id: string;
+    video_url: string;
+    video_type: string;
+    title: string;
+    description?: string;
+    order_position: number;
+}
+
+interface EditorProfileData {
     user_id: string;
     bio: string;
     city: string;
@@ -33,19 +42,10 @@ interface EditorProfile {
     rating_average: number;
     total_projects: number;
     total_reviews: number;
-    users: {
-        full_name: string;
-        username: string;
-        profile_photo_url?: string;
-    };
-    portfolio_videos: Array<{
-        id: string;
-        video_url: string;
-        video_type: string;
-        title: string;
-        description?: string;
-        order_position: number;
-    }>;
+    full_name: string;
+    username: string;
+    profile_photo_url?: string;
+    portfolio_videos: PortfolioVideo[];
 }
 
 function EditorPublicProfile() {
@@ -53,11 +53,21 @@ function EditorPublicProfile() {
     const { user, userType } = useAuth();
     const navigate = useNavigate();
 
-    const [profile, setProfile] = useState<EditorProfile | null>(null);
+    const [profile, setProfile] = useState<EditorProfileData | null>(null);
     const [loading, setLoading] = useState(true);
     const [hasWorkedTogether, setHasWorkedTogether] = useState(false);
 
     const isOwnProfile = user && profile && user.id === profile.user_id;
+
+    // Verificar se usuário tem permissão (apenas creator e admin)
+    useEffect(() => {
+        if (userType === 'editor') {
+            // Editores não podem ver perfis de outros editores
+            // Mas se for o próprio perfil (via /editor/profile/meu_username), talvez devesse permitir?
+            // O prompt 29.3 pediu restrição total por enquanto, mantendo comportamento.
+            navigate('/editor/dashboard');
+        }
+    }, [userType, navigate]);
 
     useEffect(() => {
         if (username) {
@@ -67,10 +77,13 @@ function EditorPublicProfile() {
 
     async function loadProfile() {
         try {
+            setLoading(true);
+
             // Remover @ do username se houver
             const cleanUsername = username?.replace('@', '');
 
-            const { data, error } = await supabase
+            // 1. Buscar dados do usuário e editor_profiles
+            const { data: userData, error: userError } = await supabase
                 .from('users')
                 .select(`
                     id,
@@ -86,29 +99,47 @@ function EditorPublicProfile() {
                         rating_average,
                         total_projects,
                         total_reviews
-                    ),
-                    portfolio_videos (
-                        id,
-                        video_url,
-                        video_type,
-                        title,
-                        description,
-                        order_position
                     )
                 `)
                 .eq('username', cleanUsername)
-                .single();
+                .eq('user_type', 'editor')
+                .maybeSingle();
 
-            if (error) throw error;
-            if (!data) throw new Error('User not found');
+            if (userError) {
+                console.error('Error fetching user:', userError);
+                throw userError;
+            }
 
-            // Handle editor_profiles being an array or object or null
-            const editorProfileData = Array.isArray(data.editor_profiles)
-                ? data.editor_profiles[0]
-                : data.editor_profiles;
+            if (!userData) {
+                console.log('User not found:', cleanUsername);
+                setProfile(null);
+                setLoading(false);
+                return;
+            }
 
-            const transformedProfile: EditorProfile = {
-                user_id: data.id,
+            // 2. Buscar portfólio separadamente usando o user_id
+            const { data: portfolioData, error: portfolioError } = await supabase
+                .from('portfolio_videos')
+                .select('id, video_url, video_type, title, description, order_position')
+                .eq('editor_id', userData.id)
+                .order('order_position', { ascending: true });
+
+            if (portfolioError) {
+                console.error('Error fetching portfolio:', portfolioError);
+                // Não falhar se portfólio der erro, apenas continuar sem vídeos
+            }
+
+            // 3. Processar editor_profiles (pode ser array ou objeto)
+            const editorProfileData = Array.isArray(userData.editor_profiles)
+                ? userData.editor_profiles[0]
+                : userData.editor_profiles;
+
+            // 4. Montar o objeto de perfil
+            const transformedProfile: EditorProfileData = {
+                user_id: userData.id,
+                full_name: userData.full_name || '',
+                username: userData.username || '',
+                profile_photo_url: userData.profile_photo_url,
                 bio: editorProfileData?.bio || '',
                 city: editorProfileData?.city || '',
                 state: editorProfileData?.state || '',
@@ -117,40 +148,29 @@ function EditorPublicProfile() {
                 rating_average: editorProfileData?.rating_average || 0,
                 total_projects: editorProfileData?.total_projects || 0,
                 total_reviews: editorProfileData?.total_reviews || 0,
-                users: {
-                    full_name: data.full_name,
-                    username: data.username,
-                    profile_photo_url: data.profile_photo_url,
-                },
-                portfolio_videos: data.portfolio_videos || [],
+                portfolio_videos: portfolioData || [],
             };
-
-            // Ordenar vídeos
-            if (transformedProfile.portfolio_videos) {
-                transformedProfile.portfolio_videos.sort((a: any, b: any) => a.order_position - b.order_position);
-            }
 
             setProfile(transformedProfile);
 
-            // Check if worked together (if user is creator)
+            // 5. Verificar se já trabalhou com este editor (se usuário é creator)
             if (user && userType === 'creator') {
                 const { count } = await supabase
                     .from('projects')
                     .select('*', { count: 'exact', head: true })
                     .eq('creator_id', user.id)
-                    .eq('assigned_editor_id', data.id)
+                    .eq('assigned_editor_id', userData.id)
                     .eq('status', 'completed');
 
                 setHasWorkedTogether((count || 0) > 0);
             }
         } catch (error) {
             console.error('Error loading profile:', error);
+            setProfile(null);
         } finally {
             setLoading(false);
         }
     }
-
-
 
     if (loading) {
         return (
@@ -190,7 +210,7 @@ function EditorPublicProfile() {
         <DashboardLayout
             userType={userType as any}
             title="Perfil do Editor"
-            subtitle={profile.users.full_name}
+            subtitle={profile.full_name}
         >
             <div className="max-w-5xl mx-auto space-y-6">
                 {/* Header */}
@@ -199,19 +219,19 @@ function EditorPublicProfile() {
                         <div className="flex flex-col md:flex-row gap-6">
                             {/* Avatar */}
                             <Avatar className="w-32 h-32 mx-auto md:mx-0 border-4 border-background shadow-lg">
-                                <AvatarImage src={profile.users.profile_photo_url} alt={profile.users.full_name} />
+                                <AvatarImage src={profile.profile_photo_url} alt={profile.full_name} />
                                 <AvatarFallback className="text-4xl">
-                                    {profile.users.full_name.charAt(0)}
+                                    {profile.full_name?.charAt(0) || '?'}
                                 </AvatarFallback>
                             </Avatar>
 
                             {/* Info */}
                             <div className="flex-1 text-center md:text-left">
                                 <h1 className="text-3xl font-bold text-foreground mb-2">
-                                    {profile.users.full_name}
+                                    {profile.full_name}
                                 </h1>
                                 <p className="text-lg text-muted-foreground mb-4">
-                                    @{profile.users.username}
+                                    @{profile.username}
                                 </p>
 
                                 {/* Stats */}
@@ -268,7 +288,7 @@ function EditorPublicProfile() {
                                         </Button>
                                         <FavoriteButton
                                             editorId={profile.user_id}
-                                            editorName={profile.users.full_name}
+                                            editorName={profile.full_name}
                                             size="lg"
                                             showLabel
                                         />
@@ -290,44 +310,42 @@ function EditorPublicProfile() {
                 </Card>
 
                 {/* Specialties */}
-                <Card>
-                    <CardContent className="p-6">
-                        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                            <Briefcase className="w-5 h-5" />
-                            Especialidades
-                        </h3>
-                        <div className="flex flex-wrap gap-2">
-                            {profile.specialties?.map((specialty) => (
-                                <Badge key={specialty} variant="default" className="text-base px-3 py-1">
-                                    {specialty}
-                                </Badge>
-                            ))}
-                            {(!profile.specialties || profile.specialties.length === 0) && (
-                                <p className="text-muted-foreground">Nenhuma especialidade listada.</p>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
+                {profile.specialties && profile.specialties.length > 0 && (
+                    <Card>
+                        <CardContent className="p-6">
+                            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                                <Briefcase className="w-5 h-5" />
+                                Especialidades
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                                {profile.specialties.map((specialty) => (
+                                    <Badge key={specialty} variant="default" className="text-base px-3 py-1">
+                                        {specialty}
+                                    </Badge>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Software Skills */}
-                <Card>
-                    <CardContent className="p-6">
-                        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                            <Code className="w-5 h-5" />
-                            Softwares
-                        </h3>
-                        <div className="flex flex-wrap gap-2">
-                            {profile.software_skills?.map((software) => (
-                                <Badge key={software} variant="secondary" className="text-base px-3 py-1">
-                                    {software}
-                                </Badge>
-                            ))}
-                            {(!profile.software_skills || profile.software_skills.length === 0) && (
-                                <p className="text-muted-foreground">Nenhum software listado.</p>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
+                {profile.software_skills && profile.software_skills.length > 0 && (
+                    <Card>
+                        <CardContent className="p-6">
+                            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                                <Code className="w-5 h-5" />
+                                Softwares
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                                {profile.software_skills.map((software) => (
+                                    <Badge key={software} variant="secondary" className="text-base px-3 py-1">
+                                        {software}
+                                    </Badge>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Portfolio */}
                 {profile.portfolio_videos && profile.portfolio_videos.length > 0 && (

@@ -169,7 +169,7 @@ export default function Favorites() {
                                     onSaveNote={() => handleSaveNote(editor.editor_id)}
                                     onCancelEdit={handleCancelEdit}
                                     onRemove={() => handleRemoveFavorite(editor)}
-                                    onViewProfile={() => navigate(`/creator/editor/${editor.editor_id}`)}
+                                    onViewProfile={() => navigate(`/editor/profile/${editor.editor_username}`)}
                                 />
                             ))}
                         </div>
@@ -249,6 +249,7 @@ function FavoriteCard({
                         <h3 className="font-semibold text-gray-900 truncate">
                             {editor.editor_name}
                         </h3>
+                        <p className="text-xs text-gray-500 truncate">@{editor.editor_username}</p>
 
                         {/* Rating e Projetos */}
                         <div className="flex items-center gap-3 mt-1 text-sm">

@@ -19,6 +19,7 @@ import {
     Film,
     Sparkles,
     Users,
+
     FileText,
     ExternalLink,
     Loader2,
@@ -393,25 +394,16 @@ function ProjectDetails() {
                         )}
 
                         {/* Price & Applications */}
-                        <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border">
-                            <div>
-                                <p className="text-sm text-muted-foreground mb-1">Valor do Projeto</p>
-                                <p className="text-3xl font-bold text-green-600 flex items-center gap-2">
-                                    <DollarSign className="w-7 h-7" />
-                                    R$ {Number(project.base_price).toFixed(2).replace('.', ',')}
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Você receberá após aprovação do vídeo
-                                </p>
-                            </div>
-
-                            <div className="text-right">
-                                <p className="text-sm text-muted-foreground mb-1">Candidaturas</p>
-                                <p className="text-2xl font-bold text-foreground flex items-center gap-2 justify-end">
-                                    <Users className="w-6 h-6" />
-                                    {applicationCount} / 5
-                                </p>
-                            </div>
+                        {/* Price - Candidaturas ocultas para editor (visível apenas para Creator) */}
+                        <div className="p-4 bg-muted/30 rounded-lg border">
+                            <p className="text-sm text-muted-foreground mb-1">Valor do Projeto</p>
+                            <p className="text-3xl font-bold text-green-600 flex items-center gap-2">
+                                <DollarSign className="w-7 h-7" />
+                                R$ {Number(project.base_price).toFixed(2).replace('.', ',')}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Você receberá após aprovação do vídeo
+                            </p>
                         </div>
                     </Card>
 

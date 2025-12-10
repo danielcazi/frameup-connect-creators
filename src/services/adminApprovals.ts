@@ -68,7 +68,7 @@ export async function getEditorApprovalDetails(
         const { data: userData, error: userError } = await supabase
             .from('users')
             .select('id, email, full_name')
-            .eq('user_id', editorId)
+            .eq('id', editorId)
             .single();
 
         if (userError) throw userError;

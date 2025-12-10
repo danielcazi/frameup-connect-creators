@@ -5,6 +5,8 @@ export type ProjectStatus =
   | 'open'
   | 'in_progress'
   | 'in_review'
+  | 'revision_requested'
+  | 'pending_approval'
   | 'completed'
   | 'cancelled';
 
@@ -81,6 +83,7 @@ export interface Project {
   max_applications: number;
   current_applications: number;
   current_revisions: number;
+  revision_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -140,4 +143,27 @@ export interface UserMetadataExtension {
   bias_score: number;
   total_warnings: number;
   updated_at: string;
+}
+
+// Reviews System Types
+export interface Review {
+  id: string;
+  project_id: string;
+  reviewer_id: string;
+  reviewee_id: string;
+  rating_communication: number;
+  rating_quality: number;
+  rating_deadline: number;
+  rating_professionalism: number;
+  rating_overall: number;
+  comment: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Review with relations for display purposes
+export interface ReviewWithRelations extends Review {
+  reviewer?: User;
+  reviewee?: User;
+  project?: Project;
 }

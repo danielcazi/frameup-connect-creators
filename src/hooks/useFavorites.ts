@@ -9,6 +9,8 @@ import {
     FavoriteFilters,
 } from '@/services/favoritesService';
 
+export type { FavoriteEditor };
+
 interface UseFavoritesReturn {
     // Lista de favoritos
     favorites: FavoriteEditor[];

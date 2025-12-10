@@ -1,9 +1,9 @@
 # 🏗️ FRAMEUP - PROJECT STATE
 
 ## 📊 STATUS GERAL
-**Fase Atual:** 27.13 - Creator View Fixes (Concluída)
-**Progresso Geral:** 99.5%
-**Próxima Fase:** 28.0 - Deploy e Testes Finais
+**Fase Atual:** 28.0 - Deploy e Testes Finais
+**Progresso Geral:** 99.8%
+**Próxima Fase:** 29.0 - Monitoramento e Manutenção
 
 ---
 
@@ -67,6 +67,10 @@
     - Padronização de status ("Aberto", "Em Andamento").
     - Correções visuais em `CreatorProjectCard` e `ProjectDetails`.
 
+### ✅ Fase 28: Deploy (Em Andamento)
+- [ ] Deploy para GitHub
+- [ ] Verificação final em produção
+
 ---
 
 ## 📂 ESTRUTURA DE ARQUIVOS PRINCIPAIS
@@ -106,6 +110,7 @@ src/
 │   ├── shared/                     # [NOVO] Páginas compartilhadas (RevisionView)
 │   └── RecoverPassword.tsx         # Recuperação de senha
 │
+├── services/                   # [NOVO] Serviços de negócio (Admin, Delivery, etc)
 ├── types/
 │   ├── database.ts                 # Tipos do banco
 │   ├── delivery.ts                 # [NOVO] Tipos de entrega/revisão

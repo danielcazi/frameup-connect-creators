@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCheck, Trash2, Loader2, X } from 'lucide-react';
+import { Bell, CheckCheck, Archive, Trash2, Loader2, X } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import {
     Notification,
@@ -20,7 +20,8 @@ export default function NotificationDropdown() {
         unreadCount,
         loading,
         markAsRead,
-        markAllAsRead,
+        markAllReadAndArchive,
+        archiveNotification,
         deleteNotification,
         loadMore,
         hasMore,
@@ -50,15 +51,21 @@ export default function NotificationDropdown() {
         }
     };
 
+    // Handler para arquivar
+    const handleArchive = async (e: React.MouseEvent, notificationId: string) => {
+        e.stopPropagation();
+        await archiveNotification(notificationId);
+    };
+
     // Handler para deletar
     const handleDelete = async (e: React.MouseEvent, notificationId: string) => {
         e.stopPropagation();
         await deleteNotification(notificationId);
     };
 
-    // Handler para marcar todas como lidas
-    const handleMarkAllRead = async () => {
-        await markAllAsRead();
+    // Handler para marcar todas como lidas E arquivar
+    const handleMarkAllReadAndArchive = async () => {
+        await markAllReadAndArchive();
     };
 
     return (
@@ -90,14 +97,14 @@ export default function NotificationDropdown() {
                     <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
                         <h3 className="font-semibold text-foreground">Notificações</h3>
                         <div className="flex items-center gap-2">
-                            {unreadCount > 0 && (
+                            {notifications.length > 0 && (
                                 <button
-                                    onClick={handleMarkAllRead}
+                                    onClick={handleMarkAllReadAndArchive}
                                     className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 font-medium"
-                                    title="Marcar todas como lidas"
+                                    title="Marcar todas como lidas e arquivar"
                                 >
                                     <CheckCheck className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Marcar todas</span>
+                                    <span className="hidden sm:inline">Limpar todas</span>
                                 </button>
                             )}
                             <button
@@ -130,6 +137,7 @@ export default function NotificationDropdown() {
                                         key={notification.id}
                                         notification={notification}
                                         onClick={() => handleNotificationClick(notification)}
+                                        onArchive={(e) => handleArchive(e, notification.id)}
                                         onDelete={(e) => handleDelete(e, notification.id)}
                                     />
                                 ))}
@@ -153,22 +161,20 @@ export default function NotificationDropdown() {
                     </div>
 
                     {/* Footer */}
-                    {notifications.length > 0 && (
-                        <div className="border-t border-border px-4 py-2 bg-muted/30">
-                            <button
-                                onClick={() => {
-                                    const path = window.location.pathname.startsWith('/creator')
-                                        ? '/creator/notifications'
-                                        : '/editor/notifications';
-                                    navigate(path);
-                                    setIsOpen(false);
-                                }}
-                                className="w-full text-center text-sm text-primary hover:text-primary/80 font-medium"
-                            >
-                                Ver todas as notificações
-                            </button>
-                        </div>
-                    )}
+                    <div className="border-t border-border px-4 py-2 bg-muted/30">
+                        <button
+                            onClick={() => {
+                                const path = window.location.pathname.startsWith('/creator')
+                                    ? '/creator/notifications'
+                                    : '/editor/notifications';
+                                navigate(path);
+                                setIsOpen(false);
+                            }}
+                            className="w-full text-center text-sm text-primary hover:text-primary/80 font-medium"
+                        >
+                            Ver todas as notificações
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
@@ -179,17 +185,18 @@ export default function NotificationDropdown() {
 interface NotificationItemProps {
     notification: Notification;
     onClick: () => void;
+    onArchive: (e: React.MouseEvent) => void;
     onDelete: (e: React.MouseEvent) => void;
 }
 
-function NotificationItem({ notification, onClick, onDelete }: NotificationItemProps) {
-    const [showDelete, setShowDelete] = useState(false);
+function NotificationItem({ notification, onClick, onArchive, onDelete }: NotificationItemProps) {
+    const [showActions, setShowActions] = useState(false);
 
     return (
         <div
             onClick={onClick}
-            onMouseEnter={() => setShowDelete(true)}
-            onMouseLeave={() => setShowDelete(false)}
+            onMouseEnter={() => setShowActions(true)}
+            onMouseLeave={() => setShowActions(false)}
             className={cn(
                 'flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors',
                 'hover:bg-accent/50 border-b border-border last:border-0',
@@ -229,15 +236,24 @@ function NotificationItem({ notification, onClick, onDelete }: NotificationItemP
                 </p>
             </div>
 
-            {/* Botão deletar */}
-            {showDelete && (
-                <button
-                    onClick={onDelete}
-                    className="flex-shrink-0 p-1 hover:bg-destructive/10 rounded transition-colors"
-                    title="Remover notificação"
-                >
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                </button>
+            {/* Botões de ação */}
+            {showActions && (
+                <div className="flex-shrink-0 flex items-center gap-1">
+                    <button
+                        onClick={onArchive}
+                        className="p-1 hover:bg-primary/10 rounded transition-colors"
+                        title="Arquivar"
+                    >
+                        <Archive className="w-4 h-4 text-primary" />
+                    </button>
+                    <button
+                        onClick={onDelete}
+                        className="p-1 hover:bg-destructive/10 rounded transition-colors"
+                        title="Remover"
+                    >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                    </button>
+                </div>
             )}
         </div>
     );

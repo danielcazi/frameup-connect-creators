@@ -8,6 +8,7 @@ export interface FavoriteEditor {
     favorite_id: string;
     editor_id: string;
     editor_name: string;
+    editor_username: string;
     editor_email: string;
     editor_photo: string | null;
     editor_bio: string | null;
@@ -127,7 +128,7 @@ export async function getFavorites(
         if (error) throw error;
 
         // Buscar total
-        let countQuery = supabase
+        const countQuery = supabase
             .from('creator_favorites')
             .select('*', { count: 'exact', head: true })
             .eq('creator_id', creatorId);

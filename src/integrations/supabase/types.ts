@@ -359,6 +359,7 @@ export type Database = {
                     title: string
                     updated_at: string | null
                     video_type: string | null
+                    revision_count: number | null
                 }
                 Insert: {
                     budget: number
@@ -372,6 +373,7 @@ export type Database = {
                     title: string
                     updated_at?: string | null
                     video_type?: string | null
+                    revision_count?: number | null
                 }
                 Update: {
                     budget?: number
@@ -385,6 +387,7 @@ export type Database = {
                     title?: string
                     updated_at?: string | null
                     video_type?: string | null
+                    revision_count?: number | null
                 }
                 Relationships: [
                     {
@@ -394,6 +397,73 @@ export type Database = {
                         referencedRelation: "users"
                         referencedColumns: ["id"]
                     },
+                ]
+            }
+            reviews: {
+                Row: {
+                    id: string
+                    project_id: string
+                    reviewer_id: string
+                    reviewee_id: string
+                    rating_communication: number
+                    rating_quality: number
+                    rating_deadline: number
+                    rating_professionalism: number
+                    rating_overall: number
+                    comment: string | null
+                    created_at: string
+                    updated_at: string
+                }
+                Insert: {
+                    id?: string
+                    project_id: string
+                    reviewer_id: string
+                    reviewee_id: string
+                    rating_communication: number
+                    rating_quality: number
+                    rating_deadline: number
+                    rating_professionalism: number
+                    rating_overall: number
+                    comment?: string | null
+                    created_at?: string
+                    updated_at?: string
+                }
+                Update: {
+                    id?: string
+                    project_id?: string
+                    reviewer_id?: string
+                    reviewee_id?: string
+                    rating_communication?: number
+                    rating_quality?: number
+                    rating_deadline?: number
+                    rating_professionalism?: number
+                    rating_overall?: number
+                    comment?: string | null
+                    created_at?: string
+                    updated_at?: string
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "reviews_project_id_fkey"
+                        columns: ["project_id"]
+                        isOneToOne: false
+                        referencedRelation: "projects"
+                        referencedColumns: ["id"]
+                    },
+                    {
+                        foreignKeyName: "reviews_reviewer_id_fkey"
+                        columns: ["reviewer_id"]
+                        isOneToOne: false
+                        referencedRelation: "users"
+                        referencedColumns: ["id"]
+                    },
+                    {
+                        foreignKeyName: "reviews_reviewee_id_fkey"
+                        columns: ["reviewee_id"]
+                        isOneToOne: false
+                        referencedRelation: "users"
+                        referencedColumns: ["id"]
+                    }
                 ]
             }
             transactions: {
@@ -574,6 +644,8 @@ export type Database = {
             | "open"
             | "in_progress"
             | "in_review"
+            | "revision_requested"
+            | "pending_approval"
             | "completed"
             | "cancelled"
             subscription_status_enum:

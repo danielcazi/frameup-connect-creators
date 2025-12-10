@@ -209,21 +209,15 @@ async function fetchHealthMetrics(startDate: string) {
         return sum + (accepted - created);
     }, 0) / (assignedProjects?.length || 1) / (1000 * 60 * 60 * 24); // dias
 
-    // Ratings médios
-    const { data: creatorReviews } = await supabase
-        .from('reviews')
-        .select('rating')
-        .eq('reviewee_type', 'creator')
-        .gte('created_at', startDate);
-
+    // Ratings médios (reviews são de criadores avaliando editores)
     const { data: editorReviews } = await supabase
         .from('reviews')
-        .select('rating')
-        .eq('reviewee_type', 'editor')
+        .select('rating_overall')
         .gte('created_at', startDate);
 
-    const avgCreatorRating = (creatorReviews?.reduce((sum, r) => sum + r.rating, 0) || 0) / (creatorReviews?.length || 1);
-    const avgEditorRating = (editorReviews?.reduce((sum, r) => sum + r.rating, 0) || 0) / (editorReviews?.length || 1);
+    const avgEditorRating = (editorReviews?.reduce((sum, r) => sum + r.rating_overall, 0) || 0) / (editorReviews?.length || 1);
+    // Creator ratings not available in current schema (reviews are from creators to editors)
+    const avgCreatorRating = 0;
 
     // Taxa de disputa
     const withDisputes = projects?.filter(p => p.has_dispute).length || 0;
