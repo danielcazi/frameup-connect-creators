@@ -1,9 +1,9 @@
 # 🏗️ FRAMEUP - PROJECT STATE
 
 ## 📊 STATUS GERAL
-**Fase Atual:** 28.0 - Deploy e Testes Finais
-**Progresso Geral:** 99.8%
-**Próxima Fase:** 29.0 - Monitoramento e Manutenção
+**Fase Atual:** 29.0 - Monitoramento e Manutenção
+**Progresso Geral:** 99.9%
+**Próxima Fase:** 30.0 - Handoff e Encerramento
 
 ---
 
@@ -67,9 +67,17 @@
     - Padronização de status ("Aberto", "Em Andamento").
     - Correções visuais em `CreatorProjectCard` e `ProjectDetails`.
 
-### ✅ Fase 28: Deploy (Em Andamento)
-- [ ] Deploy para GitHub
-- [ ] Verificação final em produção
+### ✅ Fase 28: Polimento e Ajustes (09-10 Dez)
+- [x] **Editor Dashboard:** Reordenação de seções (Projetos > Candidaturas).
+- [x] **Editor Kanban:** Refatoração para 5 colunas, contador de revisões e novos status.
+- [x] **Notificações:** Implementação da página de preferências e rotas.
+- [x] **Video Player:** Correção de carregamento (YouTube API/Drive), tratamento de erros e fallbacks.
+- [x] **Admin:** Otimização da lista de usuários (Layout compacto, Scroll infinito).
+- [x] **Deploy:** Preparação e envio inicial para GitHub.
+
+### 🔄 Fase 29: Verificação em Produção (Em Andamento)
+- [ ] Configuração de Environment Variables em Produção
+- [ ] Verificação final de fluxos críticos (Pagamento, Upload, Notificações)
 
 ---
 

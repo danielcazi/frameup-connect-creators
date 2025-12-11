@@ -49,6 +49,7 @@ import SuspiciousUsers from "./pages/admin/SuspiciousUsers";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminProjects from "./pages/admin/AdminProjects";
 import AdminProjectDetails from "./pages/admin/AdminProjectDetails";
+import UserDetails from "./pages/admin/UserDetails";
 import Analytics from "./pages/admin/Analytics";
 import Notifications from "./pages/shared/Notifications";
 import Favorites from "./pages/creator/Favorites";
@@ -59,8 +60,8 @@ import EditorProposals from "./pages/editor/Proposals";
 import DeliverVideo from "./pages/editor/DeliverVideo";
 import ReviewDelivery from "./pages/creator/ReviewDelivery";
 import RevisionView from "./pages/shared/RevisionView";
+import AdminRevisionView from "./pages/admin/AdminRevisionView";
 import NotificationPreferences from '@/pages/shared/NotificationPreferences';
-import UserDetails from "./pages/admin/UserDetails";
 
 const queryClient = new QueryClient();
 
@@ -206,14 +207,6 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredUserType="creator">
                     <CreatorProfile />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/creator/notifications/preferences"
-                element={
-                  <ProtectedRoute requiredUserType="creator">
-                    <NotificationPreferences />
                   </ProtectedRoute>
                 }
               />
@@ -364,14 +357,6 @@ const App = () => (
                 }
               />
               <Route
-                path="/editor/notifications/preferences"
-                element={
-                  <ProtectedRoute requiredUserType="editor">
-                    <NotificationPreferences />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
                 path="/editor/proposals"
                 element={
                   <ProtectedRoute requiredUserType="editor">
@@ -395,6 +380,7 @@ const App = () => (
                 <Route path="users/:userId" element={<UserDetails />} />
                 <Route path="projects" element={<AdminProjects />} />
                 <Route path="projects/:id" element={<AdminProjectDetails />} />
+                <Route path="projects/:projectId/revision/:version" element={<AdminRevisionView />} />
                 <Route path="analytics" element={<Analytics />} />
               </Route>
 

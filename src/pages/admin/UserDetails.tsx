@@ -1,13 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAdmin } from '@/hooks/useAdmin';
-import {
-    getUserFullDetails,
-    UserFullDetails,
-    banUser,
-    unbanUser,
-    issueWarning,
-} from '@/services/adminUsers';
+import { useToast } from '@/hooks/use-toast';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -18,26 +12,26 @@ import {
     Calendar,
     MapPin,
     Star,
+    Briefcase,
+    DollarSign,
+    AlertTriangle,
     Ban,
     Shield,
-    AlertTriangle,
-    CheckCircle,
-    XCircle,
-    Clock,
-    DollarSign,
-    Briefcase,
-    MessageSquare,
     FileText,
     TrendingUp,
     TrendingDown,
-    ExternalLink,
-    MoreVertical,
+    Clock,
+    CheckCircle,
+    XCircle,
     AlertCircle,
+    MoreVertical,
+    CreditCard,
+    Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
     DropdownMenu,
@@ -54,6 +48,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -61,20 +56,20 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
+import { Label } from '@/components/ui/label';
+import { getUserFullDetails, banUser, unbanUser, issueWarning } from '@/services/adminUsers';
+import type { UserFullDetails } from '@/services/adminUsers';
 
 export default function UserDetails() {
-    const { userId } = useParams<{ userId: string }>();
+    const { userId } = useParams();
     const navigate = useNavigate();
     const { admin, hasPermission } = useAdmin();
     const { toast } = useToast();
 
-    const [loading, setLoading] = useState(true);
     const [user, setUser] = useState<UserFullDetails | null>(null);
-    const [activeTab, setActiveTab] = useState('projects');
-
-    // Modais
+    const [loading, setLoading] = useState(true);
+    
+    // Modals
     const [showBanModal, setShowBanModal] = useState(false);
     const [showWarningModal, setShowWarningModal] = useState(false);
     const [banReason, setBanReason] = useState('');
@@ -85,21 +80,30 @@ export default function UserDetails() {
 
     useEffect(() => {
         if (userId) {
-            loadUserDetails();
+            loadUserData();
         }
     }, [userId]);
 
-    const loadUserDetails = async () => {
-        setLoading(true);
+    const loadUserData = async () => {
         try {
+            setLoading(true);
             const data = await getUserFullDetails(userId!);
-            setUser(data);
+            if (data) {
+                setUser(data);
+            } else {
+                toast({
+                    variant: 'destructive',
+                    title: 'Erro',
+                    description: 'Usuário não encontrado.'
+                });
+                navigate('/admin/users');
+            }
         } catch (error) {
             console.error('Erro ao carregar usuário:', error);
             toast({
                 variant: 'destructive',
                 title: 'Erro',
-                description: 'Não foi possível carregar os dados do usuário.',
+                description: 'Erro ao carregar dados do usuário.'
             });
         } finally {
             setLoading(false);
@@ -107,147 +111,151 @@ export default function UserDetails() {
     };
 
     const handleBanUser = async () => {
-        if (!banReason.trim()) {
-            toast({ variant: 'destructive', title: 'Erro', description: 'Informe o motivo do banimento.' });
-            return;
-        }
-
+        if (!admin || !userId || !banReason.trim()) return;
+        
         setActionLoading(true);
         try {
-            const result = await banUser(userId!, admin!.id, banReason);
-            if (result.success) {
-                toast({ title: 'Sucesso', description: 'Usuário banido com sucesso.' });
-                setShowBanModal(false);
-                setBanReason('');
-                loadUserDetails();
+            const isBanned = user?.metadata?.is_banned;
+            
+            if (isBanned) {
+                const result = await unbanUser(userId, admin.id);
+                if (result.success) {
+                    toast({ title: 'Sucesso', description: 'Usuário desbanido com sucesso.' });
+                    loadUserData();
+                } else {
+                    throw new Error(result.error);
+                }
             } else {
-                throw new Error(result.error);
+                const result = await banUser(userId, admin.id, banReason);
+                if (result.success) {
+                    toast({ title: 'Sucesso', description: 'Usuário banido com sucesso.' });
+                    loadUserData();
+                } else {
+                    throw new Error(result.error);
+                }
             }
+            setShowBanModal(false);
+            setBanReason('');
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro', description: error.message });
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
-    const handleUnbanUser = async () => {
-        setActionLoading(true);
-        try {
-            const result = await unbanUser(userId!, admin!.id);
-            if (result.success) {
-                toast({ title: 'Sucesso', description: 'Usuário desbanido com sucesso.' });
-                loadUserDetails();
-            } else {
-                throw new Error(result.error);
-            }
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro', description: error.message });
+            toast({
+                variant: 'destructive',
+                title: 'Erro',
+                description: error.message || 'Erro ao executar ação.'
+            });
         } finally {
             setActionLoading(false);
         }
     };
 
     const handleIssueWarning = async () => {
-        if (!warningType || !warningReason.trim()) {
-            toast({ variant: 'destructive', title: 'Erro', description: 'Preencha todos os campos.' });
-            return;
-        }
-
+        if (!admin || !userId || !warningType || !warningReason.trim()) return;
+        
         setActionLoading(true);
         try {
-            const result = await issueWarning(userId!, admin!.id, warningType, warningSeverity, warningReason);
+            const result = await issueWarning(
+                userId,
+                admin.id,
+                warningType,
+                warningSeverity,
+                warningReason
+            );
+            
             if (result.success) {
                 toast({ title: 'Sucesso', description: 'Advertência emitida com sucesso.' });
+                loadUserData();
                 setShowWarningModal(false);
                 setWarningType('');
+                setWarningSeverity('medium');
                 setWarningReason('');
-                loadUserDetails();
             } else {
                 throw new Error(result.error);
             }
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro', description: error.message });
+            toast({
+                variant: 'destructive',
+                title: 'Erro',
+                description: error.message || 'Erro ao emitir advertência.'
+            });
         } finally {
             setActionLoading(false);
         }
     };
 
     const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-        }).format(value);
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
     };
 
     const getStatusBadge = (status: string) => {
-        const statusConfig: Record<string, { color: string; label: string }> = {
-            open: { color: 'bg-blue-100 text-blue-800', label: 'Aberto' },
-            in_progress: { color: 'bg-yellow-100 text-yellow-800', label: 'Em Andamento' },
-            in_review: { color: 'bg-purple-100 text-purple-800', label: 'Em Revisão' },
-            completed: { color: 'bg-green-100 text-green-800', label: 'Concluído' },
-            cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelado' },
-            pending: { color: 'bg-yellow-100 text-yellow-800', label: 'Pendente' },
-            paid: { color: 'bg-green-100 text-green-800', label: 'Pago' },
-            held: { color: 'bg-orange-100 text-orange-800', label: 'Retido' },
-            released: { color: 'bg-green-100 text-green-800', label: 'Liberado' },
-            refunded: { color: 'bg-red-100 text-red-800', label: 'Reembolsado' },
-            investigating: { color: 'bg-yellow-100 text-yellow-800', label: 'Investigando' },
-            resolved: { color: 'bg-green-100 text-green-800', label: 'Resolvida' },
-            closed: { color: 'bg-gray-100 text-gray-800', label: 'Fechada' },
+        const configs: Record<string, string> = {
+            open: 'bg-yellow-100 text-yellow-800',
+            in_progress: 'bg-blue-100 text-blue-800',
+            in_review: 'bg-purple-100 text-purple-800',
+            completed: 'bg-green-100 text-green-800',
+            cancelled: 'bg-red-100 text-red-800',
         };
-        const config = statusConfig[status] || { color: 'bg-gray-100 text-gray-800', label: status };
-        return <Badge className={config.color}>{config.label}</Badge>;
+        return configs[status] || 'bg-gray-100 text-gray-800';
+    };
+
+    const getPaymentStatusBadge = (status: string) => {
+        const configs: Record<string, string> = {
+            pending: 'bg-yellow-100 text-yellow-800',
+            paid: 'bg-green-100 text-green-800',
+            held: 'bg-blue-100 text-blue-800',
+            released: 'bg-green-100 text-green-800',
+            refunded: 'bg-red-100 text-red-800',
+        };
+        return configs[status] || 'bg-gray-100 text-gray-800';
     };
 
     if (loading) {
         return (
             <div className="p-6 max-w-7xl mx-auto">
-                <Skeleton className="h-8 w-48 mb-6" />
+                <div className="flex items-center gap-4 mb-6">
+                    <Skeleton className="h-10 w-10" />
+                    <Skeleton className="h-8 w-64" />
+                </div>
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    <Skeleton className="h-96" />
-                    <div className="lg:col-span-3">
-                        <Skeleton className="h-96" />
-                    </div>
+                    <Skeleton className="h-[400px]" />
+                    <Skeleton className="h-[400px] lg:col-span-3" />
                 </div>
             </div>
         );
     }
 
-    if (!user) {
-        return (
-            <div className="p-6 max-w-7xl mx-auto">
-                <div className="text-center py-12">
-                    <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h2 className="text-xl font-semibold text-gray-900">Usuário não encontrado</h2>
-                    <p className="text-gray-500 mt-2">O usuário solicitado não existe ou foi removido.</p>
-                    <Button onClick={() => navigate('/admin/users')} className="mt-4">
-                        Voltar para lista
-                    </Button>
-                </div>
-            </div>
-        );
-    }
+    if (!user) return null;
 
     const isBanned = user.metadata?.is_banned || false;
 
     return (
-        <div className="p-4 lg:p-6 max-w-7xl mx-auto">
+        <div className="p-6 max-w-7xl mx-auto">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="sm" onClick={() => navigate('/admin/users')}>
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Voltar
+                    <Button variant="ghost" size="icon" onClick={() => navigate('/admin/users')}>
+                        <ArrowLeft className="w-5 h-5" />
                     </Button>
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">{user.profile.full_name}</h1>
-                        <p className="text-sm text-gray-500">
-                            {user.profile.user_type === 'creator' ? 'Criador de Conteúdo' : 'Editor de Vídeo'}
-                        </p>
+                    <div className="flex items-center gap-3">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg ${
+                            user.profile.user_type === 'creator' ? 'bg-blue-500' : 'bg-purple-500'
+                        }`}>
+                            {user.profile.full_name?.charAt(0) || 'U'}
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-2xl font-bold text-gray-900">{user.profile.full_name}</h1>
+                                <Badge className={user.profile.user_type === 'creator' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}>
+                                    {user.profile.user_type === 'creator' ? 'Creator' : 'Editor'}
+                                </Badge>
+                                {isBanned && (
+                                    <Badge variant="destructive">Banido</Badge>
+                                )}
+                            </div>
+                            <p className="text-sm text-gray-500">{user.profile.email}</p>
+                        </div>
                     </div>
                 </div>
 
-                {/* Ações */}
+                {/* Actions Dropdown */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="outline">
@@ -257,26 +265,17 @@ export default function UserDetails() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         {hasPermission('ban_users') && (
-                            <>
-                                {isBanned ? (
-                                    <DropdownMenuItem onClick={handleUnbanUser} disabled={actionLoading}>
-                                        <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
-                                        Remover Banimento
-                                    </DropdownMenuItem>
-                                ) : (
-                                    <DropdownMenuItem onClick={() => setShowBanModal(true)}>
-                                        <Ban className="w-4 h-4 mr-2 text-red-600" />
-                                        Banir Usuário
-                                    </DropdownMenuItem>
-                                )}
-                            </>
+                            <DropdownMenuItem onClick={() => setShowBanModal(true)}>
+                                <Ban className="w-4 h-4 mr-2" />
+                                {isBanned ? 'Desbanir Usuário' : 'Banir Usuário'}
+                            </DropdownMenuItem>
                         )}
                         <DropdownMenuItem onClick={() => setShowWarningModal(true)}>
-                            <AlertTriangle className="w-4 h-4 mr-2 text-yellow-600" />
+                            <AlertTriangle className="w-4 h-4 mr-2" />
                             Emitir Advertência
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => navigate(`/admin/users/${userId}/logs`)}>
+                        <DropdownMenuItem disabled>
                             <FileText className="w-4 h-4 mr-2" />
                             Ver Logs de Ações
                         </DropdownMenuItem>
@@ -284,441 +283,373 @@ export default function UserDetails() {
                 </DropdownMenu>
             </div>
 
-            {/* Alert se banido */}
-            {isBanned && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-                    <Ban className="w-5 h-5 text-red-600 mt-0.5" />
-                    <div>
-                        <h3 className="font-medium text-red-800">Usuário Banido</h3>
-                        <p className="text-sm text-red-600 mt-1">{user.metadata?.ban_reason || 'Motivo não informado'}</p>
-                        {user.metadata?.banned_at && (
-                            <p className="text-xs text-red-500 mt-1">
-                                Banido em {format(new Date(user.metadata.banned_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                            </p>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Layout principal: Sidebar + Conteúdo */}
+            {/* Main Content: Sidebar + Tabs */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                {/* Sidebar - Informações do Perfil */}
-                <div className="lg:col-span-1 space-y-4">
-                    {/* Card de Perfil */}
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="text-center mb-4">
-                                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-3">
-                                    {user.profile.full_name.charAt(0).toUpperCase()}
-                                </div>
-                                <Badge className={user.profile.user_type === 'creator' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}>
-                                    {user.profile.user_type === 'creator' ? 'Creator' : 'Editor'}
-                                </Badge>
+                {/* Sidebar */}
+                <div className="space-y-4">
+                    {/* Profile Info */}
+                    <Card className="p-4">
+                        <h3 className="font-semibold text-gray-900 mb-3">Informações</h3>
+                        <div className="space-y-3 text-sm">
+                            <div className="flex items-center gap-2 text-gray-600">
+                                <Mail className="w-4 h-4" />
+                                <span className="truncate">{user.profile.email}</span>
                             </div>
-
-                            <div className="space-y-3 text-sm">
-                                <div className="flex items-center gap-2 text-gray-600">
-                                    <Mail className="w-4 h-4" />
-                                    <span className="truncate">{user.profile.email}</span>
-                                </div>
-                                {user.profile.phone && (
-                                    <div className="flex items-center gap-2 text-gray-600">
-                                        <Phone className="w-4 h-4" />
-                                        <span>{user.profile.phone}</span>
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-2 text-gray-600">
-                                    <Calendar className="w-4 h-4" />
-                                    <span>Desde {format(new Date(user.profile.created_at), 'MMM yyyy', { locale: ptBR })}</span>
-                                </div>
-                                {user.editor_profile?.city && (
-                                    <div className="flex items-center gap-2 text-gray-600">
-                                        <MapPin className="w-4 h-4" />
-                                        <span>{user.editor_profile.city}, {user.editor_profile.state}</span>
-                                    </div>
-                                )}
+                            <div className="flex items-center gap-2 text-gray-600">
+                                <Phone className="w-4 h-4" />
+                                <span>{user.profile.phone || 'Não informado'}</span>
                             </div>
-                        </CardContent>
+                            <div className="flex items-center gap-2 text-gray-600">
+                                <Calendar className="w-4 h-4" />
+                                <span>Cadastro: {format(new Date(user.profile.created_at), 'dd/MM/yyyy', { locale: ptBR })}</span>
+                            </div>
+                            {user.editor_profile?.city && (
+                                <div className="flex items-center gap-2 text-gray-600">
+                                    <MapPin className="w-4 h-4" />
+                                    <span>{user.editor_profile.city}, {user.editor_profile.state}</span>
+                                </div>
+                            )}
+                        </div>
                     </Card>
 
-                    {/* Card de Estatísticas */}
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-gray-600">Estatísticas</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">Projetos</span>
-                                <span className="font-semibold">{user.stats.total_projects}</span>
+                    {/* Stats */}
+                    <Card className="p-4">
+                        <h3 className="font-semibold text-gray-900 mb-3">Estatísticas</h3>
+                        <div className="space-y-3 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">Total de Projetos</span>
+                                <span className="font-medium">{user.stats.total_projects}</span>
                             </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">Concluídos</span>
-                                <span className="font-semibold text-green-600">{user.stats.completed_projects}</span>
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">Concluídos</span>
+                                <span className="font-medium text-green-600">{user.stats.completed_projects}</span>
                             </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">Cancelados</span>
-                                <span className="font-semibold text-red-600">{user.stats.cancelled_projects}</span>
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">Cancelados</span>
+                                <span className="font-medium text-red-600">{user.stats.cancelled_projects}</span>
                             </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">Avaliação</span>
-                                <div className="flex items-center gap-1">
-                                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                                    <span className="font-semibold">{user.stats.average_rating.toFixed(1)}</span>
-                                </div>
-                            </div>
-                            {user.profile.user_type === 'creator' && (
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">Total Gasto</span>
-                                    <span className="font-semibold">{formatCurrency(user.stats.total_spent)}</span>
+                            {user.stats.average_rating > 0 && (
+                                <div className="flex justify-between">
+                                    <span className="text-gray-600">Avaliação Média</span>
+                                    <span className="font-medium flex items-center gap-1">
+                                        <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                                        {user.stats.average_rating.toFixed(1)}
+                                    </span>
                                 </div>
                             )}
-                            {user.profile.user_type === 'editor' && (
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">Total Ganho</span>
-                                    <span className="font-semibold text-green-600">{formatCurrency(user.stats.total_earned)}</span>
-                                </div>
-                            )}
-                            {user.stats.payment_held > 0 && (
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-600">Retido</span>
-                                    <span className="font-semibold text-orange-600">{formatCurrency(user.stats.payment_held)}</span>
-                                </div>
-                            )}
-                        </CardContent>
+                            <div className="border-t pt-2 mt-2">
+                                {user.profile.user_type === 'creator' ? (
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Total Gasto</span>
+                                        <span className="font-medium">{formatCurrency(user.stats.total_spent)}</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Total Recebido</span>
+                                        <span className="font-medium text-green-600">{formatCurrency(user.stats.total_earned)}</span>
+                                    </div>
+                                )}
+                                {user.stats.payment_held > 0 && (
+                                    <div className="flex justify-between mt-1">
+                                        <span className="text-gray-600">Valor Retido</span>
+                                        <span className="font-medium text-orange-600">{formatCurrency(user.stats.payment_held)}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </Card>
 
-                    {/* Card de Alertas */}
-                    {(user.stats.open_disputes > 0 || user.warnings.filter(w => w.is_active).length > 0) && (
-                        <Card className="border-yellow-200 bg-yellow-50">
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium text-yellow-800 flex items-center gap-2">
-                                    <AlertCircle className="w-4 h-4" />
-                                    Alertas
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2 text-sm">
+                    {/* Alerts */}
+                    {(user.stats.open_disputes > 0 || (user.metadata?.total_warnings || 0) > 0) && (
+                        <Card className="p-4 border-orange-200 bg-orange-50">
+                            <h3 className="font-semibold text-orange-800 mb-3 flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4" />
+                                Alertas
+                            </h3>
+                            <div className="space-y-2 text-sm">
                                 {user.stats.open_disputes > 0 && (
-                                    <div className="text-yellow-800">
-                                        {user.stats.open_disputes} disputa(s) em aberto
+                                    <div className="flex justify-between text-orange-700">
+                                        <span>Disputas Abertas</span>
+                                        <Badge variant="outline" className="border-orange-300 text-orange-700">
+                                            {user.stats.open_disputes}
+                                        </Badge>
                                     </div>
                                 )}
-                                {user.warnings.filter(w => w.is_active).length > 0 && (
-                                    <div className="text-yellow-800">
-                                        {user.warnings.filter(w => w.is_active).length} advertência(s) ativa(s)
+                                {(user.metadata?.total_warnings || 0) > 0 && (
+                                    <div className="flex justify-between text-orange-700">
+                                        <span>Advertências</span>
+                                        <Badge variant="outline" className="border-orange-300 text-orange-700">
+                                            {user.metadata?.total_warnings}
+                                        </Badge>
                                     </div>
                                 )}
-                            </CardContent>
+                            </div>
                         </Card>
                     )}
 
-                    {/* Assinatura (se editor) */}
-                    {user.subscription && (
-                        <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium text-gray-600">Assinatura</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="font-semibold">{user.subscription.plan_name}</span>
-                                    {getStatusBadge(user.subscription.status)}
+                    {/* Subscription (Editor only) */}
+                    {user.profile.user_type === 'editor' && user.subscription && (
+                        <Card className="p-4">
+                            <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                                <CreditCard className="w-4 h-4" />
+                                Assinatura
+                            </h3>
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-gray-600">Plano</span>
+                                    <span className="font-medium">{user.subscription.plan_name}</span>
                                 </div>
-                                <p className="text-xs text-gray-500">
-                                    Válida até {format(new Date(user.subscription.current_period_end), 'dd/MM/yyyy')}
-                                </p>
-                            </CardContent>
+                                <div className="flex justify-between">
+                                    <span className="text-gray-600">Status</span>
+                                    <Badge className={user.subscription.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                                        {user.subscription.status === 'active' ? 'Ativa' : user.subscription.status}
+                                    </Badge>
+                                </div>
+                                {user.subscription.current_period_end && (
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-600">Expira em</span>
+                                        <span className="text-xs">{format(new Date(user.subscription.current_period_end), 'dd/MM/yyyy', { locale: ptBR })}</span>
+                                    </div>
+                                )}
+                            </div>
                         </Card>
                     )}
                 </div>
 
-                {/* Conteúdo Principal - Tabs */}
+                {/* Tabs Content */}
                 <div className="lg:col-span-3">
-                    <Tabs value={activeTab} onValueChange={setActiveTab}>
-                        <TabsList className="grid grid-cols-4 mb-4">
+                    <Tabs defaultValue="projects" className="space-y-4">
+                        <TabsList>
                             <TabsTrigger value="projects" className="flex items-center gap-2">
                                 <Briefcase className="w-4 h-4" />
-                                <span className="hidden sm:inline">Projetos</span>
+                                Projetos
                             </TabsTrigger>
                             <TabsTrigger value="financial" className="flex items-center gap-2">
                                 <DollarSign className="w-4 h-4" />
-                                <span className="hidden sm:inline">Financeiro</span>
+                                Financeiro
                             </TabsTrigger>
                             <TabsTrigger value="disputes" className="flex items-center gap-2">
-                                <MessageSquare className="w-4 h-4" />
-                                <span className="hidden sm:inline">Disputas</span>
-                                {user.stats.open_disputes > 0 && (
-                                    <Badge variant="destructive" className="ml-1 h-5 w-5 p-0 justify-center">
-                                        {user.stats.open_disputes}
-                                    </Badge>
-                                )}
+                                <AlertCircle className="w-4 h-4" />
+                                Disputas
                             </TabsTrigger>
                             <TabsTrigger value="history" className="flex items-center gap-2">
-                                <FileText className="w-4 h-4" />
-                                <span className="hidden sm:inline">Histórico</span>
+                                <Clock className="w-4 h-4" />
+                                Histórico
                             </TabsTrigger>
                         </TabsList>
 
-                        {/* Tab: Projetos */}
+                        {/* Projects Tab */}
                         <TabsContent value="projects">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Histórico de Projetos</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {user.projects.length === 0 ? (
-                                        <div className="text-center py-8 text-gray-500">
-                                            <Briefcase className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                                            <p>Nenhum projeto encontrado</p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {user.projects.map((project) => (
-                                                <div
-                                                    key={project.id}
-                                                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                                                    onClick={() => navigate(`/admin/projects/${project.id}`)}
-                                                >
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <h4 className="font-medium text-gray-900 truncate">{project.title}</h4>
-                                                            <Badge variant="outline" className="text-xs">
-                                                                {project.role === 'creator' ? 'Como Creator' : 'Como Editor'}
-                                                            </Badge>
-                                                        </div>
-                                                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                                                            <span>{formatCurrency(project.base_price)}</span>
-                                                            {project.other_party && (
-                                                                <span>
-                                                                    {project.role === 'creator' ? 'Editor: ' : 'Creator: '}
-                                                                    {project.other_party.name}
-                                                                </span>
-                                                            )}
-                                                            <span>{format(new Date(project.created_at), 'dd/MM/yyyy')}</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        {getStatusBadge(project.status)}
-                                                        <ExternalLink className="w-4 h-4 text-gray-400" />
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-
-                        {/* Tab: Financeiro */}
-                        <TabsContent value="financial">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Movimentações Financeiras</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {user.transactions.length === 0 ? (
-                                        <div className="text-center py-8 text-gray-500">
-                                            <DollarSign className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                                            <p>Nenhuma transação encontrada</p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {user.transactions.map((tx) => (
-                                                <div key={tx.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.type === 'project_payment' || tx.type === 'subscription_payment'
-                                                                ? 'bg-green-100'
-                                                                : tx.type === 'refund'
-                                                                    ? 'bg-red-100'
-                                                                    : 'bg-blue-100'
-                                                            }`}>
-                                                            {tx.type === 'project_payment' || tx.type === 'editor_payout' ? (
-                                                                <TrendingUp className={`w-5 h-5 ${tx.type === 'project_payment' ? 'text-green-600' : 'text-blue-600'
-                                                                    }`} />
-                                                            ) : tx.type === 'refund' ? (
-                                                                <TrendingDown className="w-5 h-5 text-red-600" />
-                                                            ) : (
-                                                                <DollarSign className="w-5 h-5 text-blue-600" />
-                                                            )}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-medium text-gray-900">
-                                                                {tx.type === 'project_payment' && 'Pagamento de Projeto'}
-                                                                {tx.type === 'editor_payout' && 'Repasse para Editor'}
-                                                                {tx.type === 'subscription_payment' && 'Pagamento de Assinatura'}
-                                                                {tx.type === 'refund' && 'Reembolso'}
-                                                                {tx.type === 'platform_fee' && 'Taxa da Plataforma'}
-                                                            </p>
-                                                            <p className="text-sm text-gray-500">
-                                                                {tx.project_title && <span>{tx.project_title} • </span>}
-                                                                {format(new Date(tx.created_at), "dd/MM/yyyy 'às' HH:mm")}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className={`font-semibold ${tx.type === 'refund' ? 'text-red-600' : 'text-gray-900'
-                                                            }`}>
-                                                            {tx.type === 'refund' ? '-' : ''}{formatCurrency(tx.amount)}
+                            <Card className="p-4">
+                                <h3 className="font-semibold mb-4">Projetos ({user.projects.length})</h3>
+                                {user.projects.length === 0 ? (
+                                    <div className="text-center py-8 text-gray-500">
+                                        <Briefcase className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                                        <p>Nenhum projeto encontrado</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {user.projects.map((project) => (
+                                            <div
+                                                key={project.id}
+                                                className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                                                onClick={() => navigate(`/admin/projects/${project.id}`)}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <Badge variant="outline" className="text-xs">
+                                                        {project.role === 'creator' ? 'Criador' : 'Editor'}
+                                                    </Badge>
+                                                    <div>
+                                                        <p className="font-medium text-gray-900">{project.title}</p>
+                                                        <p className="text-xs text-gray-500">
+                                                            {project.other_party ? `com ${project.other_party.name}` : 'Sem atribuição'} • {formatCurrency(project.base_price)}
                                                         </p>
-                                                        {getStatusBadge(tx.status)}
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </CardContent>
+                                                <div className="flex items-center gap-2">
+                                                    <Badge className={getStatusBadge(project.status)}>
+                                                        {project.status}
+                                                    </Badge>
+                                                    <Eye className="w-4 h-4 text-gray-400" />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </Card>
                         </TabsContent>
 
-                        {/* Tab: Disputas */}
+                        {/* Financial Tab */}
+                        <TabsContent value="financial">
+                            <Card className="p-4">
+                                <h3 className="font-semibold mb-4">Transações ({user.transactions.length})</h3>
+                                {user.transactions.length === 0 ? (
+                                    <div className="text-center py-8 text-gray-500">
+                                        <DollarSign className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                                        <p>Nenhuma transação encontrada</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {user.transactions.map((tx) => (
+                                            <div key={tx.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                                        tx.type === 'editor_payout' ? 'bg-green-100' :
+                                                        tx.type === 'refund' ? 'bg-red-100' : 'bg-blue-100'
+                                                    }`}>
+                                                        {tx.type === 'editor_payout' ? (
+                                                            <TrendingUp className="w-5 h-5 text-green-600" />
+                                                        ) : tx.type === 'refund' ? (
+                                                            <TrendingDown className="w-5 h-5 text-red-600" />
+                                                        ) : (
+                                                            <DollarSign className="w-5 h-5 text-blue-600" />
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-gray-900 capitalize">
+                                                            {tx.type.replace(/_/g, ' ')}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500">
+                                                            {tx.project_title || tx.description || 'Sem descrição'} • {format(new Date(tx.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className={`font-semibold ${tx.type === 'refund' ? 'text-red-600' : 'text-gray-900'}`}>
+                                                        {tx.type === 'refund' ? '-' : ''}{formatCurrency(tx.amount)}
+                                                    </p>
+                                                    <Badge className={getPaymentStatusBadge(tx.status)} variant="outline">
+                                                        {tx.status}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </Card>
+                        </TabsContent>
+
+                        {/* Disputes Tab */}
                         <TabsContent value="disputes">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Disputas</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {user.disputes.length === 0 ? (
-                                        <div className="text-center py-8 text-gray-500">
-                                            <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                                            <p>Nenhuma disputa encontrada</p>
+                            <Card className="p-4">
+                                <h3 className="font-semibold mb-4">Disputas ({user.disputes.length})</h3>
+                                {user.disputes.length === 0 ? (
+                                    <div className="text-center py-8 text-gray-500">
+                                        <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                                        <p>Nenhuma disputa encontrada</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {user.disputes.map((dispute) => (
+                                            <div
+                                                key={dispute.id}
+                                                className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                                                onClick={() => navigate(`/admin/disputes/${dispute.id}`)}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <Badge variant="outline" className={dispute.role === 'opener' ? 'border-blue-300 text-blue-700' : 'border-orange-300 text-orange-700'}>
+                                                        {dispute.role === 'opener' ? 'Abriu' : 'Disputado'}
+                                                    </Badge>
+                                                    <div>
+                                                        <p className="font-medium text-gray-900">{dispute.title}</p>
+                                                        <p className="text-xs text-gray-500">
+                                                            {dispute.other_party?.name || 'N/A'} • {dispute.project?.title || 'Projeto N/A'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Badge className={
+                                                        dispute.priority === 'urgent' ? 'bg-red-100 text-red-800' :
+                                                        dispute.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                                                        'bg-gray-100 text-gray-800'
+                                                    }>
+                                                        {dispute.priority}
+                                                    </Badge>
+                                                    <Badge variant="outline">{dispute.status}</Badge>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </Card>
+                        </TabsContent>
+
+                        {/* History Tab */}
+                        <TabsContent value="history">
+                            <div className="space-y-4">
+                                {/* Warnings */}
+                                <Card className="p-4">
+                                    <h3 className="font-semibold mb-4">Advertências ({user.warnings.length})</h3>
+                                    {user.warnings.length === 0 ? (
+                                        <div className="text-center py-6 text-gray-500">
+                                            <Shield className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                                            <p>Nenhuma advertência</p>
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
-                                            {user.disputes.map((dispute) => (
-                                                <div
-                                                    key={dispute.id}
-                                                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                                                    onClick={() => navigate(`/admin/disputes/${dispute.id}`)}
-                                                >
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <h4 className="font-medium text-gray-900 truncate">{dispute.title}</h4>
-                                                            <Badge variant={dispute.role === 'opener' ? 'outline' : 'destructive'} className="text-xs">
-                                                                {dispute.role === 'opener' ? 'Abriu' : 'Disputado'}
+                                            {user.warnings.map((warning) => (
+                                                <div key={warning.id} className={`p-3 border rounded-lg ${
+                                                    warning.severity === 'high' ? 'border-red-200 bg-red-50' :
+                                                    warning.severity === 'medium' ? 'border-yellow-200 bg-yellow-50' :
+                                                    'border-blue-200 bg-blue-50'
+                                                }`}>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge className={
+                                                                warning.severity === 'high' ? 'bg-red-100 text-red-800' :
+                                                                warning.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                                                'bg-blue-100 text-blue-800'
+                                                            }>
+                                                                {warning.severity.toUpperCase()}
                                                             </Badge>
+                                                            <span className="font-medium capitalize">{warning.warning_type.replace(/_/g, ' ')}</span>
                                                         </div>
-                                                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                                                            <span className="capitalize">{dispute.category.replace('_', ' ')}</span>
-                                                            {dispute.other_party && (
-                                                                <span>vs {dispute.other_party.name}</span>
-                                                            )}
-                                                            <span>{format(new Date(dispute.created_at), 'dd/MM/yyyy')}</span>
-                                                        </div>
+                                                        {!warning.is_active && (
+                                                            <Badge variant="outline">Expirada</Badge>
+                                                        )}
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge className={
-                                                            dispute.priority === 'urgent' ? 'bg-red-100 text-red-800' :
-                                                                dispute.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                                                                    dispute.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                                                        'bg-gray-100 text-gray-800'
-                                                        }>
-                                                            {dispute.priority}
-                                                        </Badge>
-                                                        {getStatusBadge(dispute.status)}
-                                                        <ExternalLink className="w-4 h-4 text-gray-400" />
-                                                    </div>
+                                                    <p className="text-sm text-gray-700">{warning.reason}</p>
+                                                    <p className="text-xs text-gray-500 mt-2">
+                                                        {format(new Date(warning.issued_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                                    </p>
                                                 </div>
                                             ))}
                                         </div>
                                     )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-
-                        {/* Tab: Histórico */}
-                        <TabsContent value="history">
-                            <div className="space-y-6">
-                                {/* Advertências */}
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2">
-                                            <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                                            Advertências
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {user.warnings.length === 0 ? (
-                                            <p className="text-gray-500 text-center py-4">Nenhuma advertência registrada</p>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                {user.warnings.map((warning) => (
-                                                    <div key={warning.id} className={`p-4 rounded-lg border ${warning.is_active
-                                                            ? warning.severity === 'high'
-                                                                ? 'bg-red-50 border-red-200'
-                                                                : warning.severity === 'medium'
-                                                                    ? 'bg-yellow-50 border-yellow-200'
-                                                                    : 'bg-blue-50 border-blue-200'
-                                                            : 'bg-gray-50 border-gray-200'
-                                                        }`}>
-                                                        <div className="flex items-start justify-between">
-                                                            <div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="font-medium">{warning.warning_type}</span>
-                                                                    <Badge className={
-                                                                        warning.severity === 'high' ? 'bg-red-100 text-red-800' :
-                                                                            warning.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                                                                'bg-blue-100 text-blue-800'
-                                                                    }>
-                                                                        {warning.severity}
-                                                                    </Badge>
-                                                                    {!warning.is_active && (
-                                                                        <Badge variant="outline" className="text-gray-500">Expirada</Badge>
-                                                                    )}
-                                                                </div>
-                                                                <p className="text-sm text-gray-600 mt-1">{warning.reason}</p>
-                                                                <p className="text-xs text-gray-400 mt-2">
-                                                                    Emitida em {format(new Date(warning.issued_at), "dd/MM/yyyy 'às' HH:mm")}
-                                                                    {warning.issued_by_name && ` por ${warning.issued_by_name}`}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </CardContent>
                                 </Card>
 
-                                {/* Avaliações */}
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2">
-                                            <Star className="w-5 h-5 text-yellow-500" />
-                                            Avaliações Recebidas
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {user.reviews.length === 0 ? (
-                                            <p className="text-gray-500 text-center py-4">Nenhuma avaliação recebida</p>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                {user.reviews.map((review) => (
-                                                    <div key={review.id} className="p-4 bg-gray-50 rounded-lg">
-                                                        <div className="flex items-start justify-between mb-2">
-                                                            <div>
-                                                                <p className="font-medium">{review.reviewer_name || 'Usuário Anônimo'}</p>
-                                                                <p className="text-sm text-gray-500">{review.project_title}</p>
+                                {/* Reviews */}
+                                <Card className="p-4">
+                                    <h3 className="font-semibold mb-4">Avaliações Recebidas ({user.reviews.length})</h3>
+                                    {user.reviews.length === 0 ? (
+                                        <div className="text-center py-6 text-gray-500">
+                                            <Star className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                                            <p>Nenhuma avaliação</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {user.reviews.map((review) => (
+                                                <div key={review.id} className="p-3 border rounded-lg">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex items-center">
+                                                                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                                                <span className="font-semibold ml-1">{review.rating_overall.toFixed(1)}</span>
                                                             </div>
-                                                            <div className="flex items-center gap-1">
-                                                                <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-                                                                <span className="font-semibold">{review.rating_overall.toFixed(1)}</span>
-                                                            </div>
+                                                            <span className="text-sm text-gray-500">por {review.reviewer_name || 'Usuário'}</span>
                                                         </div>
-                                                        {review.comment && (
-                                                            <p className="text-sm text-gray-600 mb-2">"{review.comment}"</p>
-                                                        )}
-                                                        <div className="grid grid-cols-4 gap-2 text-xs text-gray-500">
-                                                            <div>Comunicação: {review.rating_communication}/5</div>
-                                                            <div>Qualidade: {review.rating_quality}/5</div>
-                                                            <div>Prazo: {review.rating_deadline}/5</div>
-                                                            <div>Profissionalismo: {review.rating_professionalism}/5</div>
-                                                        </div>
-                                                        <p className="text-xs text-gray-400 mt-2">
-                                                            {format(new Date(review.created_at), "dd/MM/yyyy")}
-                                                        </p>
+                                                        <span className="text-xs text-gray-500">
+                                                            {format(new Date(review.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                                                        </span>
                                                     </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </CardContent>
+                                                    {review.comment && (
+                                                        <p className="text-sm text-gray-700 mb-2">"{review.comment}"</p>
+                                                    )}
+                                                    <p className="text-xs text-gray-500">Projeto: {review.project_title || 'N/A'}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </Card>
                             </div>
                         </TabsContent>
@@ -726,73 +657,75 @@ export default function UserDetails() {
                 </div>
             </div>
 
-            {/* Modal de Banimento */}
+            {/* Ban Modal */}
             <Dialog open={showBanModal} onOpenChange={setShowBanModal}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-red-600">
-                            <Ban className="w-5 h-5" />
-                            Banir Usuário
-                        </DialogTitle>
+                        <DialogTitle>{isBanned ? 'Desbanir Usuário' : 'Banir Usuário'}</DialogTitle>
                         <DialogDescription>
-                            Esta ação irá impedir que {user.profile.full_name} acesse a plataforma.
+                            {isBanned 
+                                ? 'O usuário poderá acessar a plataforma novamente.'
+                                : 'O usuário será impedido de acessar a plataforma.'}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="py-4">
-                        <label className="text-sm font-medium text-gray-700">Motivo do banimento *</label>
-                        <Textarea
-                            value={banReason}
-                            onChange={(e) => setBanReason(e.target.value)}
-                            placeholder="Descreva o motivo do banimento..."
-                            className="mt-2"
-                            rows={4}
-                        />
-                    </div>
+                    {!isBanned && (
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label>Motivo do banimento *</Label>
+                                <Textarea
+                                    placeholder="Descreva o motivo do banimento..."
+                                    value={banReason}
+                                    onChange={(e) => setBanReason(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    )}
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowBanModal(false)}>
                             Cancelar
                         </Button>
-                        <Button variant="destructive" onClick={handleBanUser} disabled={actionLoading}>
-                            {actionLoading ? 'Processando...' : 'Confirmar Banimento'}
+                        <Button 
+                            variant={isBanned ? 'default' : 'destructive'}
+                            onClick={handleBanUser}
+                            disabled={actionLoading || (!isBanned && !banReason.trim())}
+                        >
+                            {actionLoading ? 'Processando...' : (isBanned ? 'Desbanir' : 'Banir Usuário')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Modal de Advertência */}
+            {/* Warning Modal */}
             <Dialog open={showWarningModal} onOpenChange={setShowWarningModal}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-yellow-600">
-                            <AlertTriangle className="w-5 h-5" />
-                            Emitir Advertência
-                        </DialogTitle>
+                        <DialogTitle>Emitir Advertência</DialogTitle>
                         <DialogDescription>
-                            Registrar uma advertência formal para {user.profile.full_name}.
+                            Esta advertência ficará registrada no histórico do usuário.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
-                        <div>
-                            <label className="text-sm font-medium text-gray-700">Tipo de Advertência *</label>
+                        <div className="space-y-2">
+                            <Label>Tipo de Advertência *</Label>
                             <Select value={warningType} onValueChange={setWarningType}>
-                                <SelectTrigger className="mt-2">
+                                <SelectTrigger>
                                     <SelectValue placeholder="Selecione o tipo" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="comportamento">Comportamento Inadequado</SelectItem>
-                                    <SelectItem value="atraso">Atrasos Recorrentes</SelectItem>
-                                    <SelectItem value="qualidade">Qualidade Insatisfatória</SelectItem>
-                                    <SelectItem value="comunicacao">Falta de Comunicação</SelectItem>
-                                    <SelectItem value="pagamento">Problemas de Pagamento</SelectItem>
-                                    <SelectItem value="fraude">Tentativa de Fraude</SelectItem>
+                                    <SelectItem value="comportamento_inadequado">Comportamento Inadequado</SelectItem>
+                                    <SelectItem value="atraso_entregas">Atraso em Entregas</SelectItem>
+                                    <SelectItem value="comunicacao_ofensiva">Comunicação Ofensiva</SelectItem>
+                                    <SelectItem value="fraude_tentativa">Tentativa de Fraude</SelectItem>
+                                    <SelectItem value="spam">Spam</SelectItem>
+                                    <SelectItem value="cancelamentos_excessivos">Cancelamentos Excessivos</SelectItem>
                                     <SelectItem value="outro">Outro</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div>
-                            <label className="text-sm font-medium text-gray-700">Severidade *</label>
-                            <Select value={warningSeverity} onValueChange={(v) => setWarningSeverity(v as any)}>
-                                <SelectTrigger className="mt-2">
+                        <div className="space-y-2">
+                            <Label>Severidade *</Label>
+                            <Select value={warningSeverity} onValueChange={(v) => setWarningSeverity(v as 'low' | 'medium' | 'high')}>
+                                <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -802,14 +735,12 @@ export default function UserDetails() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div>
-                            <label className="text-sm font-medium text-gray-700">Descrição *</label>
+                        <div className="space-y-2">
+                            <Label>Motivo *</Label>
                             <Textarea
+                                placeholder="Descreva o motivo da advertência..."
                                 value={warningReason}
                                 onChange={(e) => setWarningReason(e.target.value)}
-                                placeholder="Descreva o motivo da advertência..."
-                                className="mt-2"
-                                rows={4}
                             />
                         </div>
                     </div>
@@ -817,7 +748,10 @@ export default function UserDetails() {
                         <Button variant="outline" onClick={() => setShowWarningModal(false)}>
                             Cancelar
                         </Button>
-                        <Button onClick={handleIssueWarning} disabled={actionLoading} className="bg-yellow-600 hover:bg-yellow-700">
+                        <Button 
+                            onClick={handleIssueWarning}
+                            disabled={actionLoading || !warningType || !warningReason.trim()}
+                        >
                             {actionLoading ? 'Processando...' : 'Emitir Advertência'}
                         </Button>
                     </DialogFooter>

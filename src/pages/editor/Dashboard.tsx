@@ -602,6 +602,94 @@ function EditorDashboard() {
                 )}
               </section>
 
+              {/* Marketplace */}
+              <section>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <Briefcase className="w-5 h-5 text-primary" />
+                    Novos Projetos
+                  </h2>
+                  <span className="text-sm text-muted-foreground">
+                    {projects.length} disponíveis
+                  </span>
+                </div>
+
+                {/* Alert de Limite */}
+                {currentProjectsCount >= (subscription?.subscription_plans.max_simultaneous_projects || 0) && (
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex items-start gap-3 mb-6">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-yellow-900 dark:text-yellow-300 mb-1">
+                        Limite de Projetos Atingido
+                      </p>
+                      <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                        Você atingiu o limite de {subscription?.subscription_plans.max_simultaneous_projects} projetos simultâneos.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Filters */}
+                <div className="bg-card rounded-lg border p-4 shadow-sm mb-6">
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Buscar projetos..."
+                        value={filters.search}
+                        onChange={(e) => handleFilterChange({ search: e.target.value })}
+                        className="w-full pl-10 pr-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary bg-background"
+                        aria-label="Buscar projetos"
+                      />
+                    </div>
+                    <button
+                      onClick={() => setShowFilters(!showFilters)}
+                      className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${showFilters || hasActiveFilters
+                        ? 'bg-primary/10 border-primary text-primary'
+                        : 'bg-background border-input hover:bg-accent'
+                        }`}
+                    >
+                      <Filter className="w-5 h-5" />
+                      <span>Filtros</span>
+                    </button>
+                  </div>
+                  {showFilters && (
+                    <ProjectFilters
+                      filters={filters}
+                      onFilterChange={handleFilterChange}
+                      onClearFilters={clearFilters}
+                      hasActiveFilters={hasActiveFilters}
+                    />
+                  )}
+                </div>
+
+                {/* Projects Grid */}
+                {filteredProjects.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {filteredProjects.map((project) => (
+                      <ProjectCard
+                        key={project.id}
+                        project={project}
+                        hasApplied={false}
+                        canApply={
+                          currentProjectsCount < (subscription?.subscription_plans.max_simultaneous_projects || 0)
+                        }
+                        hasSubscription={hasActiveSubscription()}
+                        onApply={() => navigate(`/editor/project/${project.id}`)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={Search}
+                    title="Nenhum projeto encontrado"
+                    description="Tente ajustar os filtros para ver mais resultados"
+                    action={hasActiveFilters ? { label: 'Limpar Filtros', onClick: clearFilters } : undefined}
+                  />
+                )}
+              </section>
+
               {/* Candidaturas em Espera - NOVA SEÇÃO */}
               <section>
                 <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
@@ -685,94 +773,6 @@ function EditorDashboard() {
                       Candidate-se aos projetos abaixo para aparecer aqui
                     </p>
                   </div>
-                )}
-              </section>
-
-              {/* Marketplace */}
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <Briefcase className="w-5 h-5 text-primary" />
-                    Novos Projetos
-                  </h2>
-                  <span className="text-sm text-muted-foreground">
-                    {projects.length} disponíveis
-                  </span>
-                </div>
-
-                {/* Alert de Limite */}
-                {currentProjectsCount >= (subscription?.subscription_plans.max_simultaneous_projects || 0) && (
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex items-start gap-3 mb-6">
-                    <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-yellow-900 dark:text-yellow-300 mb-1">
-                        Limite de Projetos Atingido
-                      </p>
-                      <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                        Você atingiu o limite de {subscription?.subscription_plans.max_simultaneous_projects} projetos simultâneos.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Filters */}
-                <div className="bg-card rounded-lg border p-4 shadow-sm mb-6">
-                  <div className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                      <input
-                        type="text"
-                        placeholder="Buscar projetos..."
-                        value={filters.search}
-                        onChange={(e) => handleFilterChange({ search: e.target.value })}
-                        className="w-full pl-10 pr-4 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary bg-background"
-                        aria-label="Buscar projetos"
-                      />
-                    </div>
-                    <button
-                      onClick={() => setShowFilters(!showFilters)}
-                      className={`flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors ${showFilters || hasActiveFilters
-                          ? 'bg-primary/10 border-primary text-primary'
-                          : 'bg-background border-input hover:bg-accent'
-                        }`}
-                    >
-                      <Filter className="w-5 h-5" />
-                      <span>Filtros</span>
-                    </button>
-                  </div>
-                  {showFilters && (
-                    <ProjectFilters
-                      filters={filters}
-                      onFilterChange={handleFilterChange}
-                      onClearFilters={clearFilters}
-                      hasActiveFilters={hasActiveFilters}
-                    />
-                  )}
-                </div>
-
-                {/* Projects Grid */}
-                {filteredProjects.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {filteredProjects.map((project) => (
-                      <ProjectCard
-                        key={project.id}
-                        project={project}
-                        hasApplied={false}
-                        canApply={
-                          currentProjectsCount < (subscription?.subscription_plans.max_simultaneous_projects || 0)
-                        }
-                        hasSubscription={hasActiveSubscription()}
-                        onApply={() => navigate(`/editor/project/${project.id}`)}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={Search}
-                    title="Nenhum projeto encontrado"
-                    description="Tente ajustar os filtros para ver mais resultados"
-                    action={hasActiveFilters ? { label: 'Limpar Filtros', onClick: clearFilters } : undefined}
-                  />
                 )}
               </section>
             </div>

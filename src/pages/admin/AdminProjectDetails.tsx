@@ -288,7 +288,7 @@ export default function AdminProjectDetails() {
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            onClick={() => navigate(`/project/${project.id}/revision/${delivery.version}`)}
+                                            onClick={() => navigate(`/admin/projects/${project.id}/revision/${delivery.version}`)}
                                         >
                                             <Eye className="w-4 h-4 mr-2" />
                                             Visualizar
