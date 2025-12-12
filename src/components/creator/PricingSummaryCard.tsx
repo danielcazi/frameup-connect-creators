@@ -59,7 +59,9 @@ export function PricingSummaryCard({ pricing }: PricingSummaryCardProps) {
                     </div>
 
                     <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Taxa da plataforma (5%)</span>
+                        <span className="text-muted-foreground">
+                            Taxa da plataforma ({pricing.platform_fee_percent || 15}%)
+                        </span>
                         <span className="font-semibold">R$ {pricing.platform_fee.toFixed(2)}</span>
                     </div>
 

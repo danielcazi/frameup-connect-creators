@@ -1,9 +1,9 @@
 # 🏗️ FRAMEUP - PROJECT STATE
 
 ## 📊 STATUS GERAL
-**Fase Atual:** 29.0 - Monitoramento e Manutenção
-**Progresso Geral:** 99.9%
-**Próxima Fase:** 30.0 - Handoff e Encerramento
+**Fase Atual:** 30.0 - Pre-Launch Polish & Deployment
+**Progresso Geral:** 100%
+**Próxima Fase:** Lançamento
 
 ---
 
@@ -75,7 +75,14 @@
 - [x] **Admin:** Otimização da lista de usuários (Layout compacto, Scroll infinito).
 - [x] **Deploy:** Preparação e envio inicial para GitHub.
 
-### 🔄 Fase 29: Verificação em Produção (Em Andamento)
+### ✅ Fase 29: Projetos em Lote e Precificação Dinâmica (Concluída)
+- [x] **29.1 - Projetos em Lote:** Estrutura de banco de dados (`batch_projects`), Hooks (`useCreatorProjects`), Serviços (`batchProjectService`).
+- [x] **29.2 - Precificação Dinâmica:** Tabela `pricing_config` atualizada, Hook `useProjectPricing` refatorado, Suporte a diferentes durações e estilos.
+- [x] **29.3 - Interface do Creator:** Novos componentes `ProjectCard` (com suporte a batch), `NewProject` atualizado com seletores dinâmicos.
+- [x] **29.4 - Gestão de Admin:** Página `PricingManagement` com CRUD completo de preços e abas por tipo de vídeo.
+- [x] **29.5 - Páginas de Projeto:** Implementação de `ProjectDetails`, `BatchVideosList` e `ProjectMaterialCard`.
+
+### 🔄 Fase 30: Pre-Launch Polish & Deployment (Atual)
 - [ ] Configuração de Environment Variables em Produção
 - [ ] Verificação final de fluxos críticos (Pagamento, Upload, Notificações)
 

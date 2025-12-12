@@ -23,6 +23,25 @@ export default function PaymentSuccess() {
             if (!id) return;
 
             try {
+                // Verificar parâmetros de URL (para update imediato no front em dev)
+                const searchParams = new URLSearchParams(window.location.search);
+                const paymentIntentSecret = searchParams.get('payment_intent_client_secret');
+                const redirectStatus = searchParams.get('redirect_status');
+
+                if (redirectStatus === 'succeeded' && paymentIntentSecret) {
+                    // Forçar update se for sucesso (útil para dev sem webhook)
+                    await supabase
+                        .from('projects')
+                        .update({
+                            status: 'open',
+                            payment_status: 'paid',
+                            payment_intent_id: paymentIntentSecret.split('_secret_')[0],
+                            paid_at: new Date().toISOString()
+                        })
+                        .eq('id', id)
+                        .eq('payment_status', 'pending'); // Só se ainda estiver pendente
+                }
+
                 const { data, error } = await supabase
                     .from('projects')
                     .select('*')

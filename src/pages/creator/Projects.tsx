@@ -9,7 +9,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import ProjectCard from '@/components/creator/ProjectCard';
+import { ProjectCard } from '@/components/creator/ProjectCard';
 import ProjectKanban from '@/components/creator/ProjectKanban';
 import EmptyState from '@/components/common/EmptyState';
 import { useToast } from '@/hooks/use-toast';

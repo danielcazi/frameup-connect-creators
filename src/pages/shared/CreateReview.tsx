@@ -139,11 +139,11 @@ function CreateReview() {
         }
 
         // Validar comentário (se fornecido)
-        if (comment.trim() && comment.trim().length < 10) {
+        if (comment.trim() && comment.trim().length < 5) {
             toast({
                 variant: 'destructive',
                 title: 'Erro',
-                description: 'Comentário deve ter pelo menos 10 caracteres',
+                description: 'Comentário deve ter pelo menos 5 caracteres',
             });
             return;
         }
@@ -384,12 +384,12 @@ function CreateReview() {
 
                             <div className="flex items-center justify-between mt-2">
                                 <p className="text-sm text-muted-foreground">
-                                    {comment.trim() ? 'Mínimo 10 caracteres' : 'Opcional'}
+                                    {comment.trim() ? 'Mínimo 5 caracteres' : 'Opcional'}
                                 </p>
                                 <p
                                     className={`text-sm ${comment.length > 500
-                                            ? 'text-destructive font-semibold'
-                                            : 'text-muted-foreground'
+                                        ? 'text-destructive font-semibold'
+                                        : 'text-muted-foreground'
                                         }`}
                                 >
                                     {comment.length} / 500

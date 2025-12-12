@@ -10,6 +10,8 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import RecoverPassword from "./pages/RecoverPassword";
+import CreatorProjectView from '@/pages/creator/ProjectView';
+import EditorProjectView from '@/pages/editor/ProjectView';
 import CreatorDashboard from "./pages/creator/Dashboard";
 import ProjectApplications from "./pages/creator/ProjectApplications";
 import NewProject from "./pages/creator/NewProject";
@@ -62,6 +64,8 @@ import ReviewDelivery from "./pages/creator/ReviewDelivery";
 import RevisionView from "./pages/shared/RevisionView";
 import AdminRevisionView from "./pages/admin/AdminRevisionView";
 import NotificationPreferences from '@/pages/shared/NotificationPreferences';
+import PricingManagement from '@/pages/admin/PricingManagement';
+import PlatformSettings from '@/pages/admin/PlatformSettings';
 
 const queryClient = new QueryClient();
 
@@ -81,27 +85,14 @@ const App = () => (
               <Route path="/recuperar-senha" element={<RecoverPassword />} />
 
               {/* Creator Protected Routes */}
-              <Route
-                path="/creator/dashboard"
-                element={
-                  <ProtectedRoute requiredUserType="creator">
-                    <CreatorDashboard />
-                  </ProtectedRoute>
-                }
-              />
+              {/* Dashboard Creator */}
+              <Route path="/creator/dashboard" element={<CreatorDashboard />} />
+              <Route path="/creator/project/:id" element={<CreatorProjectView />} />
               <Route
                 path="/creator/project/new"
                 element={
                   <ProtectedRoute requiredUserType="creator">
                     <NewProject />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/creator/project/:id"
-                element={
-                  <ProtectedRoute requiredUserType="creator">
-                    <CreatorProjectDetails />
                   </ProtectedRoute>
                 }
               />
@@ -382,6 +373,8 @@ const App = () => (
                 <Route path="projects/:id" element={<AdminProjectDetails />} />
                 <Route path="projects/:projectId/revision/:version" element={<AdminRevisionView />} />
                 <Route path="analytics" element={<Analytics />} />
+                <Route path="pricing" element={<PricingManagement />} />
+                <Route path="settings" element={<PlatformSettings />} />
               </Route>
 
               {/* 404 - Must be last */}

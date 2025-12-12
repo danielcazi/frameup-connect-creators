@@ -1,275 +1,293 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FolderOpen, CheckCircle, Clock } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import MetricCard from '@/components/creator/MetricCard';
-import ProjectCard from '@/components/creator/ProjectCard';
-import EmptyState from '@/components/common/EmptyState';
-import { useToast } from '@/hooks/use-toast';
+import { ProjectCard } from '@/components/creator/ProjectCard';
+import { useCreatorProjects } from '@/hooks/useCreatorProjects';
+import { Button } from '@/components/ui/button';
+import {
+  PlusCircle,
+  Search,
+  LayoutGrid,
+  List,
+  RefreshCw,
+  Package,
+  Clock,
+  CheckCircle2,
+  AlertTriangle
+} from 'lucide-react';
 
-interface Project {
-  id: string;
-  title: string;
-  status: string;
-  base_price: number;
-  deadline_days: number;
-  created_at: string;
-  updated_at: string;
-  _count?: {
-    applications: number;
-  };
-  assigned_editor?: {
-    full_name: string;
-    username: string;
-    profile_photo_url?: string;
-  };
-}
-
-interface Metrics {
-  activeProjects: number;
-  completedProjects: number;
-  awaitingReview: number;
-}
-
-const CreatorDashboard = () => {
+export default function CreatorDashboard() {
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
-  const { toast } = useToast();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [metrics, setMetrics] = useState<Metrics>({
-    activeProjects: 0,
-    completedProjects: 0,
-    awaitingReview: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('recent');
+  const { projects, groupedProjects, loading, error, refresh } = useCreatorProjects();
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/login');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'pending' | 'completed'>('all');
+
+  // Filtrar projetos por busca
+  const filteredProjects = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase();
+
+    const filterBySearch = (projectList: typeof projects) =>
+      projectList.filter(p =>
+        p.title.toLowerCase().includes(searchLower) ||
+        p.editor_name?.toLowerCase().includes(searchLower)
+      );
+
+    if (activeFilter === 'all') {
+      return filterBySearch(projects);
     }
-  }, [user, authLoading, navigate]);
 
-  useEffect(() => {
-    if (user) {
-      fetchProjects();
-    }
-  }, [user, statusFilter, sortBy]);
+    return filterBySearch(groupedProjects[activeFilter] || []);
+  }, [projects, groupedProjects, searchTerm, activeFilter]);
 
-  const fetchProjects = async () => {
-    if (!user) return;
-
-    setLoading(true);
-    try {
-      let query = supabase
-        .from('projects')
-        .select('*')
-        .eq('creator_id', user.id);
-
-      // Apply status filter
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
-
-      // Apply sorting
-      query = query.order('created_at', { ascending: sortBy === 'oldest' });
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Collect project IDs and assigned editor IDs
-      const projectIds = data?.map(p => p.id) || [];
-      const editorIds = Array.from(new Set(data?.map(p => p.assigned_editor_id).filter(Boolean) || []));
-
-      // Fetch editor profiles separately
-      let editorsMap: Record<string, any> = {};
-      if (editorIds.length > 0) {
-        const { data: editorsData } = await supabase
-          .from('users')
-          .select('id, full_name, username, profile_photo_url')
-          .in('id', editorIds);
-
-        if (editorsData) {
-          editorsMap = editorsData.reduce((acc, editor) => {
-            acc[editor.id] = editor;
-            return acc;
-          }, {} as Record<string, any>);
-        }
-      }
-
-      // Load application counts for each project
-      let applicationCounts: Record<string, number> = {};
-
-      if (projectIds.length > 0) {
-        const { data: applicationsData } = await supabase
-          .from('project_applications')
-          .select('project_id')
-          .in('project_id', projectIds);
-
-        applicationCounts = applicationsData?.reduce((acc, app) => {
-          acc[app.project_id] = (acc[app.project_id] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>) || {};
-      }
-
-      // Load reviewed project IDs
-      const { data: reviewsData } = await supabase
-        .from('reviews')
-        .select('project_id')
-        .eq('reviewer_id', user.id);
-
-      const reviewedProjectIds = new Set(reviewsData?.map(r => r.project_id));
-
-      // Transform projects to include _count, has_reviewed, and assigned_editor
-      const projectsWithDetails = data?.map(project => ({
-        ...project,
-        _count: {
-          applications: applicationCounts[project.id] || 0
-        },
-        has_reviewed: reviewedProjectIds.has(project.id),
-        assigned_editor: project.assigned_editor_id ? editorsMap[project.assigned_editor_id] : null
-      })) || [];
-
-      setProjects(projectsWithDetails);
-
-      // Calculate metrics
-      setMetrics({
-        activeProjects: projectsWithDetails.filter(p => p.status === 'in_progress').length,
-        completedProjects: projectsWithDetails.filter(p => p.status === 'completed').length,
-        awaitingReview: projectsWithDetails.filter(p => p.status === 'in_review').length,
-      });
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-      toast({
-        title: "Erro ao carregar projetos",
-        description: "Não foi possível carregar seus projetos. Tente novamente.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+  // Contadores para os filtros
+  const counts = {
+    all: projects.length,
+    active: groupedProjects.active.length,
+    pending: groupedProjects.pending.length,
+    completed: groupedProjects.completed.length,
   };
 
-  const handleNewProject = () => {
-    navigate('/creator/project/new');
-  };
+  // Estatísticas rápidas
+  const stats = useMemo(() => {
+    const batchProjects = projects.filter(p => p.is_batch);
+    const totalVideos = batchProjects.reduce((acc, p) => acc + (p.batch_quantity || 0), 0);
+    const approvedVideos = batchProjects.reduce((acc, p) => acc + (p.videos_approved || 0), 0);
 
-  if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
+    return {
+      totalProjects: projects.length,
+      batchProjects: batchProjects.length,
+      totalVideos,
+      approvedVideos,
+    };
+  }, [projects]);
 
   return (
     <DashboardLayout
       userType="creator"
       title="Meus Projetos"
-      subtitle="Gerencie seus projetos de edição de vídeo"
-      headerAction={
-        <Button onClick={handleNewProject}>
-          <Plus className="mr-2 h-4 w-4" />
-          Criar Projeto
-        </Button>
-      }
+      subtitle="Gerencie seus projetos de edição"
     >
-      {/* Metrics Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <MetricCard
-          title="Projetos Ativos"
-          value={metrics.activeProjects}
-          icon={<FolderOpen />}
-          color="blue"
-          subtitle="Em andamento"
-        />
+      <div className="max-w-7xl mx-auto space-y-6">
 
-        <MetricCard
-          title="Projetos Concluídos"
-          value={metrics.completedProjects}
-          icon={<CheckCircle />}
-          color="green"
-          subtitle="Finalizados"
-        />
+        {/* Header com Ações */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Meus Projetos</h1>
+            <p className="text-muted-foreground mt-1">
+              {stats.totalProjects} projeto(s) • {stats.batchProjects} em lote • {stats.totalVideos} vídeos
+            </p>
+          </div>
 
-        <MetricCard
-          title="Aguardando Revisão"
-          value={metrics.awaitingReview}
-          icon={<Clock />}
-          color="yellow"
-          subtitle="Pendente aprovação"
-        />
-      </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refresh}
+              disabled={loading}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
 
-      {/* Projects List Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        <h2 className="text-xl font-semibold text-foreground">Todos os Projetos</h2>
-
-        <div className="flex gap-3 w-full sm:w-auto">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="open">Aguardando Editor</SelectItem>
-              <SelectItem value="in_progress">Em Andamento</SelectItem>
-              <SelectItem value="in_review">Em Revisão</SelectItem>
-              <SelectItem value="completed">Concluídos</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-full sm:w-[150px]">
-              <SelectValue placeholder="Ordenar" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="recent">Mais Recente</SelectItem>
-              <SelectItem value="oldest">Mais Antigo</SelectItem>
-            </SelectContent>
-          </Select>
+            <Button
+              onClick={() => navigate('/creator/project/new')}
+              className="bg-primary hover:bg-primary/90"
+            >
+              <PlusCircle className="w-5 h-5 mr-2" />
+              Novo Projeto
+            </Button>
+          </div>
         </div>
-      </div>
 
-      {/* Projects List */}
-      <div className="space-y-4">
+        {/* Cards de Estatísticas Rápidas */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{stats.totalProjects}</p>
+                <p className="text-xs text-muted-foreground">Total de Projetos</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{counts.active}</p>
+                <p className="text-xs text-muted-foreground">Em Andamento</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <Package className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{stats.totalVideos}</p>
+                <p className="text-xs text-muted-foreground">Vídeos em Lotes</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{stats.approvedVideos}</p>
+                <p className="text-xs text-muted-foreground">Vídeos Aprovados</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filtros e Busca */}
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Tabs de Filtro */}
+          <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
+            {[
+              { key: 'all', label: 'Todos', count: counts.all },
+              { key: 'active', label: 'Em Andamento', count: counts.active },
+              { key: 'pending', label: 'Aguardando', count: counts.pending },
+              { key: 'completed', label: 'Concluídos', count: counts.completed },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveFilter(tab.key as typeof activeFilter)}
+                className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${activeFilter === tab.key
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+              >
+                {tab.label}
+                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${activeFilter === tab.key
+                    ? 'bg-primary-foreground/20'
+                    : 'bg-background'
+                  }`}>
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1" />
+
+          {/* Busca */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Buscar projetos..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full md:w-64 pl-10 pr-4 py-2 border border-input rounded-lg bg-background focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+
+          {/* Toggle de Visualização */}
+          <div className="flex gap-1 border border-input rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded ${viewMode === 'grid'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted'
+                }`}
+              title="Visualização em grade"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded ${viewMode === 'list'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted'
+                }`}
+              title="Visualização em lista"
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Estado de Erro */}
+        {error && (
+          <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-destructive" />
+            <div>
+              <p className="font-medium text-destructive">Erro ao carregar projetos</p>
+              <p className="text-sm text-muted-foreground">{error}</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={refresh} className="ml-auto">
+              Tentar novamente
+            </Button>
+          </div>
+        )}
+
+        {/* Estado de Loading */}
         {loading && (
+          <div className="text-center py-16">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
+            <p className="text-muted-foreground mt-4">Carregando projetos...</p>
+          </div>
+        )}
+
+        {/* Lista de Projetos */}
+        {!loading && !error && (
           <>
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-32 w-full" />
+            {filteredProjects.length > 0 ? (
+              <div className={`grid gap-4 ${viewMode === 'grid'
+                  ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
+                  : 'grid-cols-1'
+                }`}>
+                {filteredProjects.map(project => (
+                  <ProjectCard
+                    key={project.id}
+                    project={project}
+                    viewMode={viewMode}
+                  />
+                ))}
+              </div>
+            ) : (
+              /* Estado Vazio */
+              <div className="text-center py-16 bg-muted/30 rounded-xl border-2 border-dashed border-muted">
+                <div className="text-6xl mb-4">📽️</div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">
+                  {searchTerm
+                    ? 'Nenhum projeto encontrado'
+                    : 'Nenhum projeto ainda'
+                  }
+                </h3>
+                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                  {searchTerm
+                    ? `Não encontramos projetos com "${searchTerm}". Tente outro termo.`
+                    : 'Crie seu primeiro projeto para começar a trabalhar com editores profissionais.'
+                  }
+                </p>
+                {!searchTerm && (
+                  <Button
+                    onClick={() => navigate('/creator/project/new')}
+                    className="bg-primary hover:bg-primary/90"
+                  >
+                    <PlusCircle className="w-5 h-5 mr-2" />
+                    Criar Primeiro Projeto
+                  </Button>
+                )}
+              </div>
+            )}
           </>
         )}
-
-        {!loading && projects.length === 0 && (
-          <EmptyState
-            illustration="projects"
-            title="Nenhum projeto ainda"
-            description="Crie seu primeiro projeto e encontre o editor perfeito para seu conteúdo."
-            action={{
-              label: "Criar Primeiro Projeto",
-              onClick: handleNewProject,
-              variant: "default",
-            }}
-          />
-        )}
-
-        {!loading && projects.map(project => (
-          <ProjectCard key={project.id} project={project} />
-        ))}
       </div>
     </DashboardLayout>
   );
-};
-
-export default CreatorDashboard;
+}

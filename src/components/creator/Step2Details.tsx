@@ -25,6 +25,7 @@ interface Step2DetailsProps {
     onBack: () => void;
     onSubmit: () => void;
     submitLabel?: string;
+    saving?: boolean;
 }
 
 export function Step2Details({ data, onChange, onBack, onSubmit, submitLabel = 'Ir para Pagamento →' }: Step2DetailsProps) {

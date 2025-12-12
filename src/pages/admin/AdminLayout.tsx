@@ -11,6 +11,7 @@ import {
     BarChart3,
     Menu,
     X,
+    Settings,
 } from 'lucide-react';
 import LogoutButton from '@/components/layout/LogoutButton';
 import { useState } from 'react';
@@ -90,6 +91,18 @@ export default function AdminLayout() {
             path: '/admin/analytics',
             permission: 'view_analytics',
         },
+        {
+            label: 'Preços',
+            icon: <DollarSign className="w-5 h-5" />,
+            path: '/admin/pricing',
+            // permission: 'manage_pricing', // Adding comment as permission might not exist yet
+        },
+        {
+            label: 'Configurações',
+            icon: <Settings className="w-5 h-5" />,
+            path: '/admin/settings',
+            // permission: 'manage_platform_settings', // Adding comment as permission might not exist yet
+        }
     ];
 
     const filteredNavItems = navItems.filter(

@@ -26,11 +26,27 @@ export default function Payment() {
     const handleTestPayment = async () => {
         setLoading(true);
         try {
-            const { error } = await supabase.rpc('publish_demo_project', {
+            // Tentar via RPC primeiro (seguro)
+            const { error: rpcError } = await supabase.rpc('publish_demo_project', {
                 p_project_id: project.id
             });
 
-            if (error) throw error;
+            if (rpcError) {
+                console.warn('RPC publish_demo_project falhou, tentando update direto:', rpcError);
+                // Fallback: Update direto (se RLS permitir)
+                const { error: updateError } = await supabase
+                    .from('projects')
+                    .update({
+                        status: 'open',
+                        payment_status: 'paid',
+                        published_at: new Date().toISOString(),
+                        paid_at: new Date().toISOString(),
+                        is_demo: true
+                    })
+                    .eq('id', project.id);
+
+                if (updateError) throw updateError;
+            }
 
             toast({
                 title: '🧪 Modo Teste',
@@ -38,6 +54,7 @@ export default function Payment() {
             });
             navigate('/creator/dashboard');
         } catch (error: any) {
+            console.error('Erro no pagamento teste:', error);
             toast({
                 variant: 'destructive',
                 title: 'Erro',

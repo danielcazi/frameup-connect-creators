@@ -84,6 +84,22 @@ export interface Project {
   current_applications: number;
   current_revisions: number;
   revision_count: number;
+
+  // Batch Fields
+  is_batch?: boolean;
+  batch_quantity?: number;
+  batch_delivery_mode?: 'sequential' | 'simultaneous';
+  batch_discount_percent?: number;
+  editor_earnings_per_video?: number;
+  editor_earnings_released?: number;
+  videos_approved?: number;
+  // Briefing aprimorado
+  brand_identity_url?: string;
+  fonts_url?: string;
+  raw_footage_url?: string;
+  raw_footage_duration?: '0-30min' | '30min-1h' | '1-3h' | '3h+';
+  music_sfx_url?: string;
+
   created_at: string;
   updated_at: string;
 }

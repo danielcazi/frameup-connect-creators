@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { calculateFullPrice, FEATURES_BY_STYLE } from '@/services/pricingService';
 
 export interface PricingData {
     pricing_id: string;
@@ -9,6 +9,7 @@ export interface PricingData {
     editor_receives: number;
     estimated_delivery_days: number;
     features: string[];
+    platform_fee_percent: number; // New field
     loading: boolean;
     error: string | null;
 }
@@ -26,13 +27,13 @@ export function useProjectPricing(
         editor_receives: 0,
         estimated_delivery_days: 0,
         features: [],
+        platform_fee_percent: 0, // Initial value
         loading: false,
         error: null
     });
 
     useEffect(() => {
         if (!video_type || !editing_style || !duration_category) {
-            // Reset pricing if any field is missing
             setPricing({
                 pricing_id: '',
                 base_price: 0,
@@ -41,62 +42,58 @@ export function useProjectPricing(
                 editor_receives: 0,
                 estimated_delivery_days: 0,
                 features: [],
+                platform_fee_percent: 0,
                 loading: false,
                 error: null
             });
             return;
         }
 
+        let isMounted = true;
+
         async function fetchPricing() {
             setPricing(prev => ({ ...prev, loading: true, error: null }));
 
             try {
-                const { data, error } = await supabase
-                    .from('pricing_table')
-                    .select('*')
-                    .eq('video_type', video_type)
-                    .eq('editing_style', editing_style)
-                    .eq('duration_category', duration_category)
-                    .maybeSingle(); // Use maybeSingle instead of single to avoid error if not found
+                // Calcular preço completo usando o serviço centralizado
+                // Por padrão assumimos quantidade 1 e entrega sequencial (ajustado depois no componente de lote se necessário)
+                const calculation = await calculateFullPrice(
+                    video_type!,
+                    editing_style!,
+                    duration_category!
+                );
 
-                if (error) throw error;
-
-                if (!data) {
+                if (isMounted) {
+                    setPricing({
+                        pricing_id: calculation.pricing_id,
+                        base_price: calculation.base_price,
+                        platform_fee: calculation.platform_fee,
+                        total_paid_by_creator: calculation.subtotal + calculation.platform_fee, // Ensure consistent total
+                        editor_receives: calculation.editor_earnings_per_video,
+                        estimated_delivery_days: calculation.estimated_delivery_days,
+                        features: FEATURES_BY_STYLE[editing_style!] || [],
+                        platform_fee_percent: calculation.platform_fee_percent, // Populate from service
+                        loading: false,
+                        error: null
+                    });
+                }
+            } catch (err) {
+                console.error('Error fetching pricing:', err);
+                if (isMounted) {
                     setPricing(prev => ({
                         ...prev,
                         loading: false,
-                        error: 'Combinação de preço não encontrada. Entre em contato.'
+                        error: 'Combinação de preço não encontrada ou erro de conexão.'
                     }));
-                    return;
                 }
-
-                // Calcular valores
-                const basePrice = Number(data.base_price);
-                const platformFee = basePrice * 0.05; // 5%
-                const totalPrice = basePrice + platformFee;
-
-                setPricing({
-                    pricing_id: data.id,
-                    base_price: basePrice,
-                    platform_fee: platformFee,
-                    total_paid_by_creator: totalPrice,
-                    editor_receives: basePrice,
-                    estimated_delivery_days: data.estimated_delivery_days,
-                    features: data.features || [],
-                    loading: false,
-                    error: null
-                });
-            } catch (err) {
-                console.error('Error fetching pricing:', err);
-                setPricing(prev => ({
-                    ...prev,
-                    loading: false,
-                    error: 'Erro ao calcular preço. Tente novamente.'
-                }));
             }
         }
 
         fetchPricing();
+
+        return () => {
+            isMounted = false;
+        };
     }, [video_type, editing_style, duration_category]);
 
     return pricing;
