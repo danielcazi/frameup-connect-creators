@@ -1,293 +1,314 @@
-import { useState, useMemo } from 'react';
+// src/pages/creator/Dashboard.tsx
+// Versão ajustada para ficar similar ao Dashboard do Editor
+
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { ProjectCard } from '@/components/creator/ProjectCard';
-import { useCreatorProjects } from '@/hooks/useCreatorProjects';
+import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  PlusCircle,
-  Search,
-  LayoutGrid,
-  List,
-  RefreshCw,
-  Package,
-  Clock,
-  CheckCircle2,
-  AlertTriangle
-} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+// Componentes Ajustados
+import { MetricCards } from '@/components/creator/MetricCards';
+import { AlertBanner } from '@/components/creator/AlertBanner';
+import { InProgressSection } from '@/components/creator/InProgressSection';
+import { ProjectsGrid } from '@/components/creator/ProjectsGrid';
+import { RecentMessages } from '@/components/creator/RecentMessages';
+
+// Helpers
+import { Project, calculateDashboardMetrics } from '@/utils/projectHelpers';
+
+
+// Error Boundary para debug
+import React from 'react';
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("Uncaught error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-red-500">
+          <h1 className="text-2xl font-bold mb-4">Algo deu errado!</h1>
+          <pre className="bg-gray-100 p-4 rounded overflow-auto max-w-full">
+            {this.state.error?.toString()}
+            <br />
+            {this.state.error?.stack}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function CreatorDashboard() {
   const navigate = useNavigate();
-  const { projects, groupedProjects, loading, error, refresh } = useCreatorProjects();
+  const { user } = useAuth();
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'pending' | 'completed'>('all');
 
-  // Filtrar projetos por busca
-  const filteredProjects = useMemo(() => {
-    const searchLower = searchTerm.toLowerCase();
+  // Estados
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-    const filterBySearch = (projectList: typeof projects) =>
-      projectList.filter(p =>
-        p.title.toLowerCase().includes(searchLower) ||
-        p.editor_name?.toLowerCase().includes(searchLower)
-      );
+  // ========== FETCH DE DADOS ==========
 
-    if (activeFilter === 'all') {
-      return filterBySearch(projects);
+  const fetchProjects = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      // 1. Buscar projetos (usando deadline_days em vez de deadline_at)
+      const { data, error } = await supabase
+        .from('projects')
+        .select(`
+          id, title, status, is_batch, batch_quantity, videos_approved,
+          base_price, video_type, editing_style, duration_category,
+          deadline_days, created_at, updated_at, assigned_editor_id
+        `)
+        .eq('creator_id', user.id)
+        .neq('status', 'cancelled')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Erro no fetch de projetos:", error);
+        throw error;
+      };
+
+      console.log('[Dashboard] Projetos carregados (raw):', data?.length);
+
+      // 2. Buscar editores separadamente
+      const editorIds = Array.from(new Set(data?.map(p => p.assigned_editor_id).filter(Boolean) || []));
+      let editorsMap: Record<string, any> = {};
+
+      if (editorIds.length > 0) {
+        const { data: editorsData, error: editorsError } = await supabase
+          .from('users')
+          .select('id, full_name, profile_photo_url')
+          .in('id', editorIds);
+
+        if (!editorsError && editorsData) {
+          editorsMap = editorsData.reduce((acc: any, editor) => {
+            acc[editor.id] = editor;
+            return acc;
+          }, {});
+        }
+      }
+
+      // 3. Formatar dados
+      const formattedProjects: Project[] = (data || []).map(p => {
+        // Calcular deadline_at baseado no deadline_days se necessário
+        // Se o projeto foi criado recentemente e tem prazo em dias
+        let calculatedDeadline = null;
+
+        if (p.deadline_days) {
+          const created = new Date(p.created_at);
+          created.setDate(created.getDate() + p.deadline_days);
+          calculatedDeadline = created.toISOString();
+        }
+
+        return {
+          id: p.id,
+          title: p.title,
+          status: p.status,
+          is_batch: p.is_batch || false,
+          batch_quantity: p.batch_quantity,
+          videos_approved: p.videos_approved || 0,
+          base_price: p.base_price || 0,
+          video_type: p.video_type,
+          editing_style: p.editing_style,
+          duration_category: p.duration_category,
+          deadline_at: calculatedDeadline, // Usa o calculado
+          created_at: p.created_at,
+          updated_at: p.updated_at,
+          creator_id: user.id,
+          editor_id: p.assigned_editor_id,
+          editor_name: p.assigned_editor_id ? editorsMap[p.assigned_editor_id]?.full_name : undefined,
+          editor_avatar: p.assigned_editor_id ? editorsMap[p.assigned_editor_id]?.profile_photo_url : undefined,
+          unread_messages: 0
+        };
+      });
+
+      setProjects(formattedProjects);
+
+      // Buscar contagem de mensagens não lidas
+      await fetchUnreadCounts(formattedProjects);
+
+    } catch (error) {
+      console.error('[Dashboard] Erro ao buscar projetos:', error);
     }
+  }, [user?.id]);
 
-    return filterBySearch(groupedProjects[activeFilter] || []);
-  }, [projects, groupedProjects, searchTerm, activeFilter]);
+  const fetchUnreadCounts = async (projectsList: Project[]) => {
+    if (!user?.id || projectsList.length === 0) return;
 
-  // Contadores para os filtros
-  const counts = {
-    all: projects.length,
-    active: groupedProjects.active.length,
-    pending: groupedProjects.pending.length,
-    completed: groupedProjects.completed.length,
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('project_id')
+        .eq('receiver_id', user.id)
+        .eq('is_read', false);
+
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      (data || []).forEach(msg => {
+        counts[msg.project_id] = (counts[msg.project_id] || 0) + 1;
+      });
+
+      setProjects(prev => prev.map(p => ({
+        ...p,
+        unread_messages: counts[p.id] || 0
+      })));
+
+    } catch (error) {
+      console.error('[Dashboard] Erro ao buscar mensagens:', error);
+    }
   };
 
-  // Estatísticas rápidas
-  const stats = useMemo(() => {
-    const batchProjects = projects.filter(p => p.is_batch);
-    const totalVideos = batchProjects.reduce((acc, p) => acc + (p.batch_quantity || 0), 0);
-    const approvedVideos = batchProjects.reduce((acc, p) => acc + (p.videos_approved || 0), 0);
+  const fetchAllData = useCallback(async () => {
+    setIsLoading(true);
+    await fetchProjects();
+    setIsLoading(false);
+  }, [fetchProjects]);
 
-    return {
-      totalProjects: projects.length,
-      batchProjects: batchProjects.length,
-      totalVideos,
-      approvedVideos,
-    };
+  // ========== EFFECTS ==========
+
+  useEffect(() => {
+    fetchAllData();
+  }, [fetchAllData]);
+
+  // Realtime
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`creator-dashboard-${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'projects',
+        filter: `creator_id=eq.${user.id}`
+      }, () => fetchProjects())
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `receiver_id=eq.${user.id}`
+      }, () => fetchProjects())
+      .subscribe();
+
+    return () => { channel.unsubscribe(); };
+  }, [user?.id, fetchProjects]);
+
+  // ========== COMPUTED VALUES ==========
+
+  const metrics = useMemo(() => calculateDashboardMetrics(projects), [projects]);
+
+  // Alertas simplificados
+  const alertCounts = useMemo(() => {
+    const reviewCount = projects.filter(p => p.status === 'in_review').length;
+    const unreadMessages = projects.reduce((sum, p) => sum + (p.unread_messages || 0), 0);
+    const urgentDeadlines = projects.filter(p => {
+      if (!p.deadline_at || p.status === 'completed') return false;
+      const hours = (new Date(p.deadline_at).getTime() - Date.now()) / (1000 * 60 * 60);
+      return hours > 0 && hours < 48;
+    }).length;
+
+    return { reviewCount, unreadMessages, urgentDeadlines };
   }, [projects]);
 
+  // ========== HANDLERS ==========
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchAllData();
+    setIsRefreshing(false);
+  };
+
+  const handleProjectClick = (projectId: string) => {
+    navigate(`/creator/project/${projectId}`);
+  };
+
+  // ========== RENDER ==========
+
   return (
-    <DashboardLayout
-      userType="creator"
-      title="Meus Projetos"
-      subtitle="Gerencie seus projetos de edição"
-    >
-      <div className="max-w-7xl mx-auto space-y-6">
+    <ErrorBoundary>
+      <DashboardLayout
+        userType="creator"
+        title="Dashboard"
+        subtitle="Visão geral dos seus projetos"
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-        {/* Header com Ações */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Meus Projetos</h1>
-            <p className="text-muted-foreground mt-1">
-              {stats.totalProjects} projeto(s) • {stats.batchProjects} em lote • {stats.totalVideos} vídeos
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
+          {/* Header com Refresh (alinhado à direita como no Editor) */}
+          <div className="flex items-center justify-end">
             <Button
               variant="outline"
               size="sm"
-              onClick={refresh}
-              disabled={loading}
+              onClick={handleRefresh}
+              disabled={isRefreshing}
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={cn("w-4 h-4 mr-2", isRefreshing && "animate-spin")} />
               Atualizar
             </Button>
-
-            <Button
-              onClick={() => navigate('/creator/project/new')}
-              className="bg-primary hover:bg-primary/90"
-            >
-              <PlusCircle className="w-5 h-5 mr-2" />
-              Novo Projeto
-            </Button>
           </div>
+
+          {/* Métricas (4 Cards) - Estilo igual ao Editor */}
+          <MetricCards
+            inProduction={metrics.inProduction}
+            awaitingReview={metrics.awaitingReview}
+            completed={metrics.completed}
+            total={metrics.total}
+            isLoading={isLoading}
+          />
+
+          {/* Grid: Em Andamento (60%) + Mensagens (40%) - Igual Editor */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            {/* Em Andamento */}
+            <div className="lg:col-span-3">
+              <InProgressSection
+                projects={projects}
+                maxItems={3}
+                onProjectClick={handleProjectClick}
+              />
+            </div>
+
+            {/* Mensagens Recentes */}
+            <div className="lg:col-span-2">
+              <RecentMessages
+                userId={user?.id || ''}
+                maxMessages={3}
+              />
+            </div>
+          </div>
+
+          {/* Banner de Alertas Compacto */}
+          <AlertBanner
+            reviewCount={alertCounts.reviewCount}
+            unreadMessages={alertCounts.unreadMessages}
+            urgentDeadlines={alertCounts.urgentDeadlines}
+          />
+
+          {/* Grid de Projetos - Similar à seção "Novos Projetos" do Editor */}
+          <ProjectsGrid
+            projects={projects}
+            maxItems={6}
+            showSearch={true}
+            showNewButton={true}
+            onProjectClick={handleProjectClick}
+          />
         </div>
-
-        {/* Cards de Estatísticas Rápidas */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-card border border-border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{stats.totalProjects}</p>
-                <p className="text-xs text-muted-foreground">Total de Projetos</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-                <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{counts.active}</p>
-                <p className="text-xs text-muted-foreground">Em Andamento</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                <Package className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{stats.totalVideos}</p>
-                <p className="text-xs text-muted-foreground">Vídeos em Lotes</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-card border border-border rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{stats.approvedVideos}</p>
-                <p className="text-xs text-muted-foreground">Vídeos Aprovados</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filtros e Busca */}
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Tabs de Filtro */}
-          <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
-            {[
-              { key: 'all', label: 'Todos', count: counts.all },
-              { key: 'active', label: 'Em Andamento', count: counts.active },
-              { key: 'pending', label: 'Aguardando', count: counts.pending },
-              { key: 'completed', label: 'Concluídos', count: counts.completed },
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveFilter(tab.key as typeof activeFilter)}
-                className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${activeFilter === tab.key
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-              >
-                {tab.label}
-                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${activeFilter === tab.key
-                    ? 'bg-primary-foreground/20'
-                    : 'bg-background'
-                  }`}>
-                  {tab.count}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          <div className="flex-1" />
-
-          {/* Busca */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Buscar projetos..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full md:w-64 pl-10 pr-4 py-2 border border-input rounded-lg bg-background focus:border-primary focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
-
-          {/* Toggle de Visualização */}
-          <div className="flex gap-1 border border-input rounded-lg p-1">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded ${viewMode === 'grid'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted'
-                }`}
-              title="Visualização em grade"
-            >
-              <LayoutGrid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded ${viewMode === 'list'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted'
-                }`}
-              title="Visualização em lista"
-            >
-              <List className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Estado de Erro */}
-        {error && (
-          <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-destructive" />
-            <div>
-              <p className="font-medium text-destructive">Erro ao carregar projetos</p>
-              <p className="text-sm text-muted-foreground">{error}</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={refresh} className="ml-auto">
-              Tentar novamente
-            </Button>
-          </div>
-        )}
-
-        {/* Estado de Loading */}
-        {loading && (
-          <div className="text-center py-16">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-            <p className="text-muted-foreground mt-4">Carregando projetos...</p>
-          </div>
-        )}
-
-        {/* Lista de Projetos */}
-        {!loading && !error && (
-          <>
-            {filteredProjects.length > 0 ? (
-              <div className={`grid gap-4 ${viewMode === 'grid'
-                  ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
-                  : 'grid-cols-1'
-                }`}>
-                {filteredProjects.map(project => (
-                  <ProjectCard
-                    key={project.id}
-                    project={project}
-                    viewMode={viewMode}
-                  />
-                ))}
-              </div>
-            ) : (
-              /* Estado Vazio */
-              <div className="text-center py-16 bg-muted/30 rounded-xl border-2 border-dashed border-muted">
-                <div className="text-6xl mb-4">📽️</div>
-                <h3 className="text-xl font-semibold text-foreground mb-2">
-                  {searchTerm
-                    ? 'Nenhum projeto encontrado'
-                    : 'Nenhum projeto ainda'
-                  }
-                </h3>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  {searchTerm
-                    ? `Não encontramos projetos com "${searchTerm}". Tente outro termo.`
-                    : 'Crie seu primeiro projeto para começar a trabalhar com editores profissionais.'
-                  }
-                </p>
-                {!searchTerm && (
-                  <Button
-                    onClick={() => navigate('/creator/project/new')}
-                    className="bg-primary hover:bg-primary/90"
-                  >
-                    <PlusCircle className="w-5 h-5 mr-2" />
-                    Criar Primeiro Projeto
-                  </Button>
-                )}
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </DashboardLayout>
+      </DashboardLayout>
+    </ErrorBoundary>
   );
 }

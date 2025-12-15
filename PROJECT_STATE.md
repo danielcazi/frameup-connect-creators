@@ -1,7 +1,7 @@
 # 🏗️ FRAMEUP - PROJECT STATE
 
 ## 📊 STATUS GERAL
-**Fase Atual:** 30.0 - Pre-Launch Polish & Deployment
+**Fase Atual:** 31.0 - Pre-Launch Polish & Deployment
 **Progresso Geral:** 100%
 **Próxima Fase:** Lançamento
 
@@ -82,7 +82,12 @@
 - [x] **29.4 - Gestão de Admin:** Página `PricingManagement` com CRUD completo de preços e abas por tipo de vídeo.
 - [x] **29.5 - Páginas de Projeto:** Implementação de `ProjectDetails`, `BatchVideosList` e `ProjectMaterialCard`.
 
-### 🔄 Fase 30: Pre-Launch Polish & Deployment (Atual)
+### ✅ Fase 30: Melhorias do Painel do Editor
+- [x] **30.1 - Arquivamento de Projetos:** Implementação de arquivamento/desarquivamento para editores com UI otimista.
+- [x] **30.2 - Organização por Cliente:** Dashboard do editor agrupado por clientes com avatares.
+- [x] **30.3 - Correção de Ganhos:** Cálculo correto de ganhos totais no dashboard do editor.
+
+### 🔄 Fase 31: Pre-Launch Polish & Deployment (Atual)
 - [ ] Configuração de Environment Variables em Produção
 - [ ] Verificação final de fluxos críticos (Pagamento, Upload, Notificações)
 

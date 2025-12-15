@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, DollarSign, Calendar, Eye } from 'lucide-react';
+import { Clock, DollarSign, Calendar, Eye, Archive, ArchiveRestore } from 'lucide-react';
 
 interface Project {
     id: string;
@@ -12,14 +12,17 @@ interface Project {
     deadline_days: number;
     created_at: string;
     revision_count?: number;
+    is_archived?: boolean;
 }
 
 interface ProjectKanbanCardProps {
     project: Project;
     columnColor?: string;
+    onArchive?: (id: string) => void;
+    onUnarchive?: (id: string) => void;
 }
 
-function ProjectKanbanCard({ project, columnColor = '#3B82F6' }: ProjectKanbanCardProps) {
+function ProjectKanbanCard({ project, columnColor = '#3B82F6', onArchive, onUnarchive }: ProjectKanbanCardProps) {
     const navigate = useNavigate();
 
     // Formatação de data - COMPACTA
@@ -27,6 +30,9 @@ function ProjectKanbanCard({ project, columnColor = '#3B82F6' }: ProjectKanbanCa
         day: '2-digit',
         month: 'short',
     });
+
+    const isCompleted = project.status === 'completed';
+    const isArchived = project.is_archived;
 
     return (
         <Card
@@ -74,23 +80,57 @@ function ProjectKanbanCard({ project, columnColor = '#3B82F6' }: ProjectKanbanCa
                     </div>
                 </div>
 
-                {/* Botão de ação - COMPACTO */}
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full mt-2 text-xs font-medium h-7"
-                    style={{
-                        borderColor: columnColor,
-                        color: columnColor
-                    }}
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/editor/project/${project.id}`);
-                    }}
-                >
-                    <Eye className="w-3 h-3 mr-1" />
-                    Ver
-                </Button>
+                {/* Botões de ação - COMPACTO */}
+                <div className="flex items-center gap-2 mt-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-xs font-medium h-7"
+                        style={{
+                            borderColor: columnColor,
+                            color: columnColor
+                        }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/editor/project/${project.id}`);
+                        }}
+                    >
+                        <Eye className="w-3 h-3 mr-1" />
+                        Ver
+                    </Button>
+
+                    {/* Botão de Arquivar (apenas concluídos) */}
+                    {isCompleted && !isArchived && onArchive && (
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                            title="Arquivar projeto"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onArchive(project.id);
+                            }}
+                        >
+                            <Archive className="w-3.5 h-3.5" />
+                        </Button>
+                    )}
+
+                    {/* Botão de Restaurar (apenas arquivados) */}
+                    {isArchived && onUnarchive && (
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7 shrink-0 text-orange-500 hover:text-orange-600 hover:bg-orange-50 border-orange-200"
+                            title="Desarquivar projeto"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onUnarchive(project.id);
+                            }}
+                        >
+                            <ArchiveRestore className="w-3.5 h-3.5" />
+                        </Button>
+                    )}
+                </div>
             </CardContent>
         </Card>
     );

@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, LayoutGrid, List } from 'lucide-react';
+import { Plus, Search, Archive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { ProjectCard } from '@/components/creator/ProjectCard';
 import ProjectKanban from '@/components/creator/ProjectKanban';
 import EmptyState from '@/components/common/EmptyState';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +31,13 @@ interface Project {
         username: string;
         profile_photo_url?: string;
     };
+    // Adicionados para compatibilidade com ProjectGridCard
+    deadline_at?: string;
+    is_batch?: boolean;
+    batch_quantity?: number;
+    video_type?: string;
+    editing_style?: string;
+    is_archived?: boolean; // New column
 }
 
 type ViewMode = 'list' | 'kanban';
@@ -46,7 +51,7 @@ const CreatorProjects = () => {
     const [statusFilter, setStatusFilter] = useState('all');
     const [sortBy, setSortBy] = useState('recent');
     const [searchTerm, setSearchTerm] = useState('');
-    const [viewMode, setViewMode] = useState<ViewMode>('list');
+    const [showArchived, setShowArchived] = useState(false);
     const debouncedSearch = useDebounce(searchTerm, 500);
 
     useEffect(() => {
@@ -59,7 +64,7 @@ const CreatorProjects = () => {
         if (user) {
             fetchProjects();
         }
-    }, [user, statusFilter, sortBy, debouncedSearch]);
+    }, [user, statusFilter, sortBy, debouncedSearch, showArchived]); // Added showArchived to dependencies
 
     const fetchProjects = async () => {
         if (!user) return;
@@ -70,11 +75,6 @@ const CreatorProjects = () => {
                 .from('projects')
                 .select('*')
                 .eq('creator_id', user.id);
-
-            // Apply status filter (apenas no modo lista)
-            if (statusFilter !== 'all' && viewMode === 'list') {
-                query = query.eq('status', statusFilter);
-            }
 
             // Apply search
             if (debouncedSearch) {
@@ -158,13 +158,18 @@ const CreatorProjects = () => {
         navigate('/creator/project/new');
     };
 
-    // Refetch quando mudar o modo de visualização
-    useEffect(() => {
-        if (user && viewMode === 'kanban') {
-            // No modo Kanban, remover filtro de status para mostrar todos
-            setStatusFilter('all');
-        }
-    }, [viewMode]);
+    // Filter projects based on showArchived toggle
+    const filteredProjects = projects.filter(project => {
+        const isArchived = project.is_archived === true;
+        if (showArchived) return isArchived;
+        return !isArchived;
+    });
+
+    // Map projects for display - override status if archived
+    const displayProjects = filteredProjects.map(p => ({
+        ...p,
+        status: showArchived ? 'archived' : p.status
+    }));
 
     if (authLoading) {
         return (
@@ -203,26 +208,15 @@ const CreatorProjects = () => {
                 </div>
 
                 <div className="flex gap-3 w-full md:w-auto items-center">
-                    {/* Filtro de Status (oculto no modo Kanban) */}
-                    {viewMode === 'list' && (
-                        <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-full md:w-[180px]">
-                                <div className="flex items-center gap-2">
-                                    <Filter className="h-4 w-4" />
-                                    <SelectValue placeholder="Status" />
-                                </div>
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Todos os Status</SelectItem>
-                                <SelectItem value="draft">Rascunho</SelectItem>
-                                <SelectItem value="open">Aguardando Editor</SelectItem>
-                                <SelectItem value="in_progress">Em Andamento</SelectItem>
-                                <SelectItem value="in_review">Em Revisão</SelectItem>
-                                <SelectItem value="completed">Concluídos</SelectItem>
-                                <SelectItem value="cancelled">Cancelados</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    )}
+                    {/* Botão de Arquivados */}
+                    <Button
+                        variant={showArchived ? "default" : "outline"}
+                        onClick={() => setShowArchived(!showArchived)}
+                        className="gap-2"
+                    >
+                        <Archive className="w-4 h-4" />
+                        {showArchived ? 'Ver Projetos Ativos' : 'Arquivados'}
+                    </Button>
 
                     <Select value={sortBy} onValueChange={setSortBy}>
                         <SelectTrigger className="w-full md:w-[150px]">
@@ -233,29 +227,6 @@ const CreatorProjects = () => {
                             <SelectItem value="oldest">Mais Antigo</SelectItem>
                         </SelectContent>
                     </Select>
-
-                    {/* Toggle de Visualização */}
-                    <ToggleGroup
-                        type="single"
-                        value={viewMode}
-                        onValueChange={(value) => value && setViewMode(value as ViewMode)}
-                        className="border rounded-lg p-1"
-                    >
-                        <ToggleGroupItem
-                            value="list"
-                            aria-label="Visualização em lista"
-                            className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground px-3"
-                        >
-                            <List className="h-4 w-4" />
-                        </ToggleGroupItem>
-                        <ToggleGroupItem
-                            value="kanban"
-                            aria-label="Visualização Kanban"
-                            className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground px-3"
-                        >
-                            <LayoutGrid className="h-4 w-4" />
-                        </ToggleGroupItem>
-                    </ToggleGroup>
                 </div>
             </div>
 
@@ -269,12 +240,12 @@ const CreatorProjects = () => {
             )}
 
             {/* Empty State */}
-            {!loading && projects.length === 0 && (
+            {!loading && filteredProjects.length === 0 && (
                 <EmptyState
                     illustration="projects"
-                    title={searchTerm ? "Nenhum projeto encontrado" : "Nenhum projeto ainda"}
-                    description={searchTerm ? "Tente buscar com outros termos." : "Crie seu primeiro projeto e encontre o editor perfeito para seu conteúdo."}
-                    action={!searchTerm ? {
+                    title={searchTerm ? "Nenhum projeto encontrado" : (showArchived ? "Nenhum projeto arquivado" : "Nenhum projeto ainda")}
+                    description={searchTerm ? "Tente buscar com outros termos." : (showArchived ? "Você não tem projetos arquivados." : "Crie seu primeiro projeto e encontre o editor perfeito para seu conteúdo.")}
+                    action={!searchTerm && !showArchived ? {
                         label: "Criar Primeiro Projeto",
                         onClick: handleNewProject,
                         variant: "default",
@@ -283,18 +254,77 @@ const CreatorProjects = () => {
             )}
 
             {/* Projects View */}
-            {!loading && projects.length > 0 && (
-                <>
-                    {viewMode === 'list' ? (
-                        <div className="space-y-4">
-                            {projects.map(project => (
-                                <ProjectCard key={project.id} project={project} />
-                            ))}
-                        </div>
-                    ) : (
-                        <ProjectKanban projects={projects} />
-                    )}
-                </>
+            {!loading && filteredProjects.length > 0 && (
+                <ProjectKanban
+                    projects={displayProjects}
+                    isArchivedView={showArchived}
+                    onArchive={async (projectId) => {
+                        try {
+                            // Optimistic update: remove from UI immediately
+                            setProjects(prev => prev.map(p =>
+                                p.id === projectId ? { ...p, is_archived: true } : p
+                            ));
+
+                            const { error } = await supabase
+                                .from('projects')
+                                .update({ is_archived: true })
+                                .eq('id', projectId);
+
+                            if (error) {
+                                // Revert if error
+                                setProjects(prev => prev.map(p =>
+                                    p.id === projectId ? { ...p, is_archived: false } : p
+                                ));
+                                throw error;
+                            }
+
+                            toast({
+                                title: "Projeto arquivado",
+                                description: "O projeto foi movido para os arquivados.",
+                            });
+                        } catch (error) {
+                            console.error('Error archiving project:', error);
+                            toast({
+                                title: "Erro ao arquivar",
+                                description: "Não foi possível arquivar o projeto.",
+                                variant: "destructive"
+                            });
+                        }
+                    }}
+                    onUnarchive={async (projectId) => {
+                        try {
+                            // Optimistic update
+                            setProjects(prev => prev.map(p =>
+                                p.id === projectId ? { ...p, is_archived: false } : p
+                            ));
+
+                            const { error } = await supabase
+                                .from('projects')
+                                .update({ is_archived: false })
+                                .eq('id', projectId);
+
+                            if (error) {
+                                // Revert
+                                setProjects(prev => prev.map(p =>
+                                    p.id === projectId ? { ...p, is_archived: true } : p
+                                ));
+                                throw error;
+                            }
+
+                            toast({
+                                title: "Projeto desarquivado",
+                                description: "O projeto voltou para a lista principal.",
+                            });
+                        } catch (error) {
+                            console.error('Error unarchiving project:', error);
+                            toast({
+                                title: "Erro ao desarquivar",
+                                description: "Não foi possível desarquivar o projeto.",
+                                variant: "destructive"
+                            });
+                        }
+                    }}
+                />
             )}
         </DashboardLayout>
     );

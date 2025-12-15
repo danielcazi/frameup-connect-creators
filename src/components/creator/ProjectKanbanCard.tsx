@@ -1,39 +1,41 @@
 import { useNavigate } from 'react-router-dom';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
     Calendar,
-    DollarSign,
-    Users,
     Eye,
+    Layers,
+    Archive,
+    ArchiveRestore,
     MessageSquare,
     PlayCircle,
-    AlertCircle,
+    Users
 } from 'lucide-react';
-
-interface Project {
-    id: string;
-    title: string;
-    status: string;
-    base_price: number;
-    deadline_days: number;
-    created_at: string;
-    _count?: {
-        applications: number;
-    };
-    has_reviewed?: boolean;
-    assigned_editor_id?: string;
-}
+import { Button } from '@/components/ui/button';
+import { Project } from '@/utils/projectHelpers';
 
 interface ProjectKanbanCardProps {
     project: Project;
+    columnColor?: string;
+    onArchive?: (projectId: string) => void;
+    onUnarchive?: (projectId: string) => void;
 }
 
-function ProjectKanbanCard({ project }: ProjectKanbanCardProps) {
+const ProjectKanbanCard = ({ project, onArchive, onUnarchive }: ProjectKanbanCardProps) => {
     const navigate = useNavigate();
     const applicationCount = project._count?.applications || 0;
     const hasApplications = applicationCount > 0;
+
+    const getDeadlineColor = (days: number) => {
+        if (days < 0) return 'text-red-500 font-medium';
+        if (days <= 2) return 'text-orange-500 font-medium';
+        return 'text-gray-500';
+    };
+
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL'
+        }).format(value);
+    };
 
     function getMainAction() {
         switch (project.status) {
@@ -66,7 +68,7 @@ function ProjectKanbanCard({ project }: ProjectKanbanCardProps) {
                     icon: MessageSquare,
                 };
             case 'in_review':
-            case 'revision_requested':
+            case 'revision_requested': // Legacy/Fallback
                 return {
                     label: project.status === 'in_review' ? 'Revisar Entrega' : 'Ver Revisão',
                     onClick: () => navigate(`/creator/project/${project.id}/review`),
@@ -93,69 +95,81 @@ function ProjectKanbanCard({ project }: ProjectKanbanCardProps) {
     }
 
     const action = getMainAction();
-    const ActionIcon = action.icon;
 
     return (
-        <Card className="p-4 hover:shadow-md transition-all cursor-pointer group bg-white dark:bg-gray-900">
-            {/* Título */}
-            <h4
-                className="font-semibold text-sm text-foreground line-clamp-2 mb-3 group-hover:text-primary transition-colors"
-                onClick={() => navigate(`/creator/project/${project.id}`)}
-            >
-                {project.title}
-            </h4>
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+            {/* Header */}
+            <div className="flex justify-between items-start mb-3">
+                <h3 className="font-medium text-gray-900 dark:text-gray-100 line-clamp-2" title={project.title}>
+                    {project.title}
+                </h3>
+            </div>
 
-            {/* Info compacta */}
-            <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
-                <div className="flex items-center gap-1">
-                    <DollarSign className="w-3 h-3" />
-                    <span>R$ {project.base_price.toFixed(0)}</span>
-                </div>
-                <div className="flex items-center gap-1">
+            {/* Price and Deadline */}
+            <div className="flex items-center gap-4 text-xs mb-4">
+                <span className="text-gray-600 dark:text-gray-400 font-medium">
+                    {formatCurrency(project.base_price)}
+                </span>
+                <span className={`flex items-center gap-1 ${getDeadlineColor(project.deadline_days)}`}>
                     <Calendar className="w-3 h-3" />
-                    <span>{project.deadline_days}d</span>
-                </div>
-                {applicationCount > 0 && (
-                    <div className="flex items-center gap-1">
-                        <Users className="w-3 h-3" />
-                        <span>{applicationCount}</span>
-                    </div>
+                    {project.deadline_days < 0
+                        ? `${Math.abs(project.deadline_days)}d atrasado`
+                        : `${project.deadline_days}d`
+                    }
+                </span>
+                {project.batch_quantity && project.batch_quantity > 1 && (
+                    <span className="text-gray-500 flex items-center gap-1">
+                        <Layers className="w-3 h-3" />
+                        {project.batch_quantity}
+                    </span>
                 )}
             </div>
 
-            {/* Alerta de candidaturas */}
-            {hasApplications && project.status === 'open' && (
-                <div className="flex items-center gap-1.5 text-xs text-yellow-600 dark:text-yellow-400 mb-3 bg-yellow-50 dark:bg-yellow-900/20 rounded px-2 py-1">
-                    <AlertCircle className="w-3 h-3" />
-                    <span className="font-medium">{applicationCount} candidatura{applicationCount !== 1 ? 's' : ''}</span>
-                </div>
-            )}
-
-            {/* Avaliação pendente */}
-            {project.status === 'completed' && !project.has_reviewed && (
-                <Badge
-                    variant="outline"
-                    className="mb-3 text-xs border-yellow-500 text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20"
+            {/* Actions */}
+            <div className="flex items-center gap-2 mt-auto pt-2 border-t border-gray-100 dark:border-gray-700">
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    className="flex-1 h-8 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 border-0"
+                    onClick={() => navigate(`/creator/project/${project.id}`)}
                 >
-                    Avaliar Pendente
-                </Badge>
-            )}
+                    <Eye className="w-3 h-3 mr-1.5" />
+                    Ver Detalhes
+                </Button>
 
-            {/* Ação principal */}
-            <Button
-                size="sm"
-                variant={action.variant}
-                className="w-full text-xs h-8"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    action.onClick();
-                }}
-            >
-                {ActionIcon && <ActionIcon className="w-3 h-3 mr-1.5" />}
-                {action.label}
-            </Button>
-        </Card>
+                {/* Archive/Unarchive Action */}
+                {project.is_archived && onUnarchive && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-400 hover:text-green-600 hover:bg-green-50"
+                        title="Desarquivar projeto"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onUnarchive(project.id);
+                        }}
+                    >
+                        <ArchiveRestore className="w-4 h-4" />
+                    </Button>
+                )}
+
+                {!project.is_archived && project.status === 'completed' && onArchive && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                        title="Arquivar projeto"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onArchive(project.id);
+                        }}
+                    >
+                        <Archive className="w-4 h-4" />
+                    </Button>
+                )}
+            </div>
+        </div>
     );
-}
+};
 
 export default ProjectKanbanCard;

@@ -19,6 +19,9 @@ interface Project {
 
 interface ProjectKanbanProps {
     projects: Project[];
+    onArchive?: (projectId: string) => void;
+    onUnarchive?: (projectId: string) => void;
+    isArchivedView?: boolean;
 }
 
 // Definição das colunas do Kanban com cores do FrameUp
@@ -71,9 +74,17 @@ const KANBAN_COLUMNS = [
         borderColor: 'border-red-200 dark:border-red-800',
         icon: XCircle,
     },
+    {
+        id: 'archived',
+        name: 'Arquivados',
+        color: '#9CA3AF', // gray-400
+        bgColor: 'bg-gray-100 dark:bg-gray-800/50',
+        borderColor: 'border-gray-300 dark:border-gray-700',
+        icon: FileText, // TODO: Use Package icon if available or FileText
+    },
 ];
 
-function ProjectKanban({ projects }: ProjectKanbanProps) {
+function ProjectKanban({ projects, onArchive, onUnarchive, isArchivedView = false }: ProjectKanbanProps) {
     // Agrupar projetos por status
     const projectsByStatus = useMemo(() => {
         const grouped: Record<string, Project[]> = {};
@@ -99,15 +110,31 @@ function ProjectKanban({ projects }: ProjectKanbanProps) {
 
     // Filtrar colunas que têm projetos ou são importantes
     const visibleColumns = useMemo(() => {
+        // Se estiver vendo arquivados, mostrar APENAS coluna de arquivados
+        if (isArchivedView) {
+            return KANBAN_COLUMNS.filter(col => col.id === 'archived');
+        }
+
         return KANBAN_COLUMNS.filter(col => {
-            // Sempre mostrar colunas principais
+            // Sempre mostrar colunas principais (exceto arquivados e cancelados)
             if (['open', 'in_progress', 'in_review', 'completed'].includes(col.id)) {
                 return true;
             }
+
+            // Mostrar draft apenas se tiver projetos
+            if (col.id === 'draft' && projectsByStatus['draft']?.length > 0) {
+                return true;
+            }
+
+            // Nunca mostrar arquivados na view normal (pois já são filtrados)
+            if (col.id === 'archived') {
+                return false;
+            }
+
             // Mostrar outras apenas se tiverem projetos
             return projectsByStatus[col.id]?.length > 0;
         });
-    }, [projectsByStatus]);
+    }, [projectsByStatus, isArchivedView]);
 
     return (
         <div className="w-full overflow-x-auto pb-4">
@@ -158,6 +185,9 @@ function ProjectKanban({ projects }: ProjectKanbanProps) {
                                         <ProjectKanbanCard
                                             key={project.id}
                                             project={project}
+                                            columnColor={column.color}
+                                            onArchive={onArchive}
+                                            onUnarchive={onUnarchive}
                                         />
                                     ))
                                 )}

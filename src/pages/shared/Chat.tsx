@@ -49,10 +49,13 @@ interface Project {
 
 interface ChatProps {
     isAdminView?: boolean;
+    projectId?: string;
+    isEmbedded?: boolean;
 }
 
-function Chat({ isAdminView = false }: ChatProps) {
-    const { id } = useParams(); // project_id
+function Chat({ isAdminView = false, projectId, isEmbedded = false }: ChatProps) {
+    const { id: paramId } = useParams(); // project_id
+    const id = projectId || paramId;
     const { user, userType } = useAuth();
     const { toast } = useToast();
     const navigate = useNavigate();
@@ -116,7 +119,7 @@ function Chat({ isAdminView = false }: ChatProps) {
             const isCreator = data.creator_id === user.id;
             const isAssignedEditor = data.assigned_editor_id === user.id;
 
-            if (!isAdminView && !isCreator && !isAssignedEditor) {
+            if (!isAdminView && !isEmbedded && !isCreator && !isAssignedEditor) {
                 toast({
                     variant: 'destructive',
                     title: 'Acesso negado',
@@ -126,7 +129,7 @@ function Chat({ isAdminView = false }: ChatProps) {
                 return;
             }
 
-            if (!isAdminView && data.status !== 'in_progress' && data.status !== 'in_review') {
+            if (!isAdminView && !isEmbedded && data.status !== 'in_progress' && data.status !== 'in_review') {
                 toast({
                     variant: 'destructive',
                     title: 'Chat indisponível',
@@ -139,13 +142,15 @@ function Chat({ isAdminView = false }: ChatProps) {
             setProject(data);
         } catch (error) {
             console.error('Error loading project:', error);
-            toast({
-                variant: 'destructive',
-                title: 'Erro',
-                description: 'Erro ao carregar projeto',
-            });
-            if (!isAdminView) {
-                navigate(userType === 'creator' ? '/creator/dashboard' : '/editor/dashboard');
+            if (!isEmbedded) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Erro',
+                    description: 'Erro ao carregar projeto',
+                });
+                if (!isAdminView) {
+                    navigate(userType === 'creator' ? '/creator/dashboard' : '/editor/dashboard');
+                }
             }
         }
     }
@@ -361,8 +366,8 @@ function Chat({ isAdminView = false }: ChatProps) {
     const messageGroups = groupMessagesByDate(messages);
 
     const ChatContent = (
-        <div className={`flex flex-col h-full ${isAdminView ? '' : 'max-w-5xl mx-auto h-[calc(100vh-200px)]'}`}>
-            {!isAdminView && (
+        <div className={`flex flex-col h-full ${isAdminView || isEmbedded ? '' : 'max-w-5xl mx-auto h-[calc(100vh-200px)]'}`}>
+            {!isAdminView && !isEmbedded && (
                 <Card className="mb-4 p-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
@@ -479,7 +484,7 @@ function Chat({ isAdminView = false }: ChatProps) {
         </div>
     );
 
-    if (isAdminView) {
+    if (isAdminView || isEmbedded) {
         return ChatContent;
     }
 

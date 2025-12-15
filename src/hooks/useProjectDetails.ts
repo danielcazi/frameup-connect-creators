@@ -20,6 +20,7 @@ export interface BatchVideo {
     approved_at: string | null;
     payment_released_at: string | null;
     payment_amount: number;
+    delivery_url?: string;
     created_at: string;
     updated_at: string;
 }

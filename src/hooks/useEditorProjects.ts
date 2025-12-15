@@ -71,6 +71,7 @@ export function useEditorProjects() {
     const [proposals, setProposals] = useState<EditorProject[]>([]);
     const [completedCount, setCompletedCount] = useState(0);
     const [applicationsCount, setApplicationsCount] = useState(0);
+    const [completedEarnings, setCompletedEarnings] = useState(0); // Novo estado
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -129,11 +130,17 @@ export function useEditorProjects() {
             // =====================================================
             // 3. BUSCAR ESTATÍSTICAS ADICIONAIS
             // =====================================================
-            const { count: completed } = await supabase
+
+            // Buscar projetos concluídos (DADOS COMPLETOS para cálculo de ganhos)
+            const { data: completedProjects, error: completedError } = await supabase
                 .from('projects')
-                .select('*', { count: 'exact', head: true })
+                .select('id, base_price, editor_earnings_released, created_at')
                 .eq('assigned_editor_id', user.id)
                 .eq('status', 'completed');
+
+            if (completedError) {
+                console.error('Erro ao buscar projetos concluídos:', completedError);
+            }
 
             const { count: applications } = await supabase
                 .from('project_applications')
@@ -141,11 +148,18 @@ export function useEditorProjects() {
                 .eq('editor_id', user.id)
                 .eq('status', 'pending');
 
-            setCompletedCount(completed || 0);
+            setCompletedCount(completedProjects?.length || 0);
             setApplicationsCount(applications || 0);
 
+            // Calcular ganhos de projetos concluídos
+            const earningsFromCompleted = (completedProjects || []).reduce((acc, p) => {
+                // Prioriza editor_earnings_released, senão usa base_price
+                return acc + (p.editor_earnings_released || p.base_price || 0);
+            }, 0);
+            setCompletedEarnings(earningsFromCompleted);
+
             // =====================================================
-            // 4. ENRIQUECER PROJETOS COM BATCH_VIDEOS
+            // 4. ENRICHER PROJETOS COM BATCH_VIDEOS
             // =====================================================
             const enrichWithBatchVideos = async (projectsList: any[]): Promise<EditorProject[]> => {
                 return Promise.all(
@@ -248,7 +262,8 @@ export function useEditorProjects() {
         pendingApplications: applicationsCount,
         totalVideos: projects.reduce((acc, p) => acc + (p.batch_quantity || 1), 0),
         approvedVideos: projects.reduce((acc, p) => acc + (p.videos_approved || 0), 0),
-        totalEarned: projects.reduce((acc, p) => acc + (p.editor_earnings_released || 0), 0),
+        // Ganhos = Ganhos de projetos concluídos + Ganhos liberados de projetos em andamento
+        totalEarned: completedEarnings + projects.reduce((acc, p) => acc + (p.editor_earnings_released || 0), 0),
         pendingEarnings: projects.reduce((acc, p) => {
             const total = (p.editor_earnings_per_video || p.base_price * 0.85) * (p.batch_quantity || 1);
             const released = p.editor_earnings_released || 0;

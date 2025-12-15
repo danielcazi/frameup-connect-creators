@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import ProjectKanbanCard from './ProjectKanbanCard';
-import { Play, Clock, CheckCircle, AlertTriangle, FileCheck } from 'lucide-react';
+import { Play, Clock, CheckCircle, AlertTriangle, FileCheck, Archive } from 'lucide-react';
 
 interface Project {
     id: string;
@@ -10,6 +10,7 @@ interface Project {
     base_price: number;
     deadline_days: number;
     created_at: string;
+    is_archived?: boolean;
     revision_count?: number;
     _count?: {
         applications: number;
@@ -18,6 +19,9 @@ interface Project {
 
 interface ProjectKanbanProps {
     projects: Project[];
+    isArchivedView?: boolean;
+    onArchive?: (id: string) => void;
+    onUnarchive?: (id: string) => void;
 }
 
 // Definição das colunas do Kanban
@@ -67,9 +71,18 @@ const KANBAN_COLUMNS = [
         borderColor: 'border-green-200 dark:border-green-800',
         icon: CheckCircle,
     },
+    {
+        id: 'archived',
+        name: 'Arquivados',
+        description: 'Projetos arquivados',
+        color: '#64748B', // slate-500
+        bgColor: 'bg-slate-50 dark:bg-slate-900/20',
+        borderColor: 'border-slate-200 dark:border-slate-800',
+        icon: Archive,
+    },
 ];
 
-function ProjectKanban({ projects }: ProjectKanbanProps) {
+function ProjectKanban({ projects, isArchivedView = false, onArchive, onUnarchive }: ProjectKanbanProps) {
     // Agrupar projetos por status
     const projectsByStatus = useMemo(() => {
         const grouped: Record<string, Project[]> = {};
@@ -100,15 +113,22 @@ function ProjectKanban({ projects }: ProjectKanbanProps) {
 
     // Filtrar apenas colunas relevantes para o workflow ativo
     const visibleColumns = useMemo(() => {
+        if (isArchivedView) {
+            return KANBAN_COLUMNS.filter(col => col.id === 'archived');
+        }
+
         return KANBAN_COLUMNS.filter(col =>
             ['in_progress', 'in_review', 'revision_requested', 'pending_approval', 'completed'].includes(col.id)
         );
-    }, []);
+    }, [isArchivedView]);
 
     return (
         <div className="w-full h-full">
-            {/* Grid responsivo - 5 colunas em telas grandes, menos em telas menores */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 lg:gap-4">
+            {/* Grid responsivo - Adaptativo baseado no número de colunas visíveis */}
+            <div className={cn(
+                "grid gap-3 lg:gap-4",
+                visibleColumns.length === 1 ? "grid-cols-1 max-w-md mx-auto" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+            )}>
                 {visibleColumns.map(column => {
                     const columnProjects = projectsByStatus[column.id] || [];
                     const Icon = column.icon;
@@ -171,6 +191,8 @@ function ProjectKanban({ projects }: ProjectKanbanProps) {
                                             key={project.id}
                                             project={project}
                                             columnColor={column.color}
+                                            onArchive={onArchive}
+                                            onUnarchive={onUnarchive}
                                         />
                                     ))
                                 )}
