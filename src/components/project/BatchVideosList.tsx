@@ -132,53 +132,30 @@ export function BatchVideosList({
 
                                         {/* Steps */}
                                         {['Aguardando', 'Em Produção', 'Entregue', 'Aprovado'].map((step, stepIndex) => {
-                                            const stepStatuses = ['pending', 'in_progress', 'delivered', 'approved']; // Changed 'awaiting_review' to 'delivered' to match my helper fix earlier? 
-                                            // Wait, in Step 36, I mapped 'delivered' to awaitingReview in stats, BUT status enum was:
-                                            // 'pending' | 'in_progress' | 'delivered' | 'revision' | 'approved'
-                                            // So here 'delivered' is the correct status string from DB.
-                                            // 'awaiting_review' is not in the type definition in batchHelpers.ts Step 36.
-                                            // Step 36: | 'delivered' // Entregue, aguardando revisão (awaiting_review)
-                                            // So I should use 'delivered' in the array, not 'awaiting_review'.
-
-                                            const currentStepIndex = stepStatuses.indexOf(video.status === 'revision' ? 'in_progress' : video.status);
-                                            // If revision, it's sort of back to in_progress or delivered? 
-                                            // 'revision' status usually means adjustments requested.
-
-                                            const isCompleted = stepIndex <= stepStatuses.indexOf(video.status === 'revision' ? 'delivered' : video.status);
-                                            // This logic is tricky. Let's stick to simple mapping or user provided code?
-                                            // User provided: const stepStatuses = ['pending', 'in_progress', 'awaiting_review', 'approved'];
-                                            // User uses 'awaiting_review'. BUT my helper uses 'delivered'.
-                                            // I MUST FIX THIS to match my helper.
+                                            // Status logic fix: Use 'delivered' (DB status) instead of 'awaiting_review'
+                                            const videoStatus = video.status;
+                                            const videoStepIndex =
+                                                videoStatus === 'approved' ? 3 :
+                                                    videoStatus === 'delivered' ? 2 :
+                                                        videoStatus === 'revision' ? 2 : // revision is basically 'delivered' but needing fix
+                                                            videoStatus === 'in_progress' ? 1 :
+                                                                0;
 
                                             return (
-                                                <div key={step} className="flex flex-col items-center z-10">
+                                                <div key={step} className="flex flex-col items-center z-10 w-20">
                                                     <div className={cn(
-                                                        'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold',
-                                                        // Logic here needs to support my 'delivered' status status mapping
-                                                        // Let's use a simpler check logic inline
-                                                        stepIndex <= (
-                                                            video.status === 'approved' ? 3 :
-                                                                video.status === 'delivered' ? 2 :
-                                                                    video.status === 'revision' ? 2 : // revision is after delivery usually
-                                                                        video.status === 'in_progress' ? 1 :
-                                                                            0
-                                                        )
+                                                        'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors',
+                                                        stepIndex <= videoStepIndex
                                                             ? 'bg-green-500 text-white'
                                                             : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
                                                     )}>
-                                                        {stepIndex <= (
-                                                            video.status === 'approved' ? 3 :
-                                                                video.status === 'delivered' ? 2 :
-                                                                    video.status === 'revision' ? 2 :
-                                                                        video.status === 'in_progress' ? 1 :
-                                                                            0
-                                                        ) ? '✓' : stepIndex + 1}
+                                                        {stepIndex < videoStepIndex ? '✓' : stepIndex + 1}
                                                     </div>
                                                     <span className={cn(
-                                                        'text-xs mt-1',
-                                                        // same logic for current
-                                                        // ...
-                                                        'text-muted-foreground'
+                                                        'text-[10px] mt-1 text-center font-medium',
+                                                        stepIndex <= videoStepIndex
+                                                            ? 'text-foreground'
+                                                            : 'text-muted-foreground'
                                                     )}>
                                                         {step}
                                                     </span>

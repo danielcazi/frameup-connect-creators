@@ -2,34 +2,22 @@ import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import ProjectKanbanCard from './ProjectKanbanCard';
 import { FileText, Clock, Play, CheckCircle, XCircle, Search } from 'lucide-react';
-
-interface Project {
-    id: string;
-    title: string;
-    status: string;
-    base_price: number;
-    deadline_days: number;
-    created_at: string;
-    _count?: {
-        applications: number;
-    };
-    has_reviewed?: boolean;
-    assigned_editor_id?: string;
-}
+import { Project, calculateBatchAggregatedStatus } from '@/utils/projectHelpers';
 
 interface ProjectKanbanProps {
     projects: Project[];
     onArchive?: (projectId: string) => void;
     onUnarchive?: (projectId: string) => void;
     isArchivedView?: boolean;
+    onOpenBatch?: (projectId: string) => void;
 }
 
-// Definição das colunas do Kanban com cores do FrameUp
+// Definição das colunas do Kanban
 const KANBAN_COLUMNS = [
     {
         id: 'draft',
         name: 'Rascunho',
-        color: '#6B7280', // gray-500
+        color: '#6B7280',
         bgColor: 'bg-gray-50 dark:bg-gray-900/50',
         borderColor: 'border-gray-200 dark:border-gray-700',
         icon: FileText,
@@ -37,7 +25,7 @@ const KANBAN_COLUMNS = [
     {
         id: 'open',
         name: 'Aguardando Editor',
-        color: '#F59E0B', // yellow-500 (cor primária FrameUp)
+        color: '#F59E0B',
         bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
         borderColor: 'border-yellow-200 dark:border-yellow-800',
         icon: Search,
@@ -45,7 +33,7 @@ const KANBAN_COLUMNS = [
     {
         id: 'in_progress',
         name: 'Em Andamento',
-        color: '#3B82F6', // blue-500
+        color: '#3B82F6',
         bgColor: 'bg-blue-50 dark:bg-blue-900/20',
         borderColor: 'border-blue-200 dark:border-blue-800',
         icon: Play,
@@ -53,7 +41,7 @@ const KANBAN_COLUMNS = [
     {
         id: 'in_review',
         name: 'Em Revisão',
-        color: '#8B5CF6', // purple-500
+        color: '#8B5CF6',
         bgColor: 'bg-purple-50 dark:bg-purple-900/20',
         borderColor: 'border-purple-200 dark:border-purple-800',
         icon: Clock,
@@ -61,7 +49,7 @@ const KANBAN_COLUMNS = [
     {
         id: 'completed',
         name: 'Concluídos',
-        color: '#22C55E', // green-500
+        color: '#22C55E',
         bgColor: 'bg-green-50 dark:bg-green-900/20',
         borderColor: 'border-green-200 dark:border-green-800',
         icon: CheckCircle,
@@ -69,7 +57,7 @@ const KANBAN_COLUMNS = [
     {
         id: 'cancelled',
         name: 'Cancelados',
-        color: '#EF4444', // red-500
+        color: '#EF4444',
         bgColor: 'bg-red-50 dark:bg-red-900/20',
         borderColor: 'border-red-200 dark:border-red-800',
         icon: XCircle,
@@ -77,61 +65,85 @@ const KANBAN_COLUMNS = [
     {
         id: 'archived',
         name: 'Arquivados',
-        color: '#9CA3AF', // gray-400
+        color: '#9CA3AF',
         bgColor: 'bg-gray-100 dark:bg-gray-800/50',
         borderColor: 'border-gray-300 dark:border-gray-700',
-        icon: FileText, // TODO: Use Package icon if available or FileText
+        icon: FileText,
     },
 ];
 
-function ProjectKanban({ projects, onArchive, onUnarchive, isArchivedView = false }: ProjectKanbanProps) {
+function ProjectKanban({
+    projects,
+    onArchive,
+    onUnarchive,
+    isArchivedView = false,
+    onOpenBatch
+}: ProjectKanbanProps) {
+
+    // Função auxiliar para mapear status
+    const getKanbanStatus = (status: string) => {
+        switch (status) {
+            case 'revision_requested':
+                return 'in_progress';
+            case 'pending_approval':
+                return 'in_review';
+            default:
+                return status;
+        }
+    };
+
+    // Processar projetos: calcular status agregado para lotes
+    const processedProjects = useMemo(() => {
+        return projects.map(project => {
+            // Se for lote com vídeos, calcular status agregado
+            if (project.is_batch && project.batch_videos && project.batch_videos.length > 0) {
+                const aggregatedStatus = calculateBatchAggregatedStatus(project.batch_videos);
+                return { ...project, status: aggregatedStatus };
+            }
+            return project;
+        });
+    }, [projects]);
+
     // Agrupar projetos por status
     const projectsByStatus = useMemo(() => {
         const grouped: Record<string, Project[]> = {};
 
-        // Inicializar todas as colunas
         KANBAN_COLUMNS.forEach(col => {
             grouped[col.id] = [];
         });
 
-        // Distribuir projetos
-        projects.forEach(project => {
-            const status = project.status;
-            if (grouped[status]) {
-                grouped[status].push(project);
+        processedProjects.forEach(project => {
+            const mappedStatus = getKanbanStatus(project.status);
+            if (grouped[mappedStatus]) {
+                grouped[mappedStatus].push(project);
             } else {
-                // Se status não reconhecido, colocar em draft
                 grouped['draft'].push(project);
             }
         });
 
         return grouped;
-    }, [projects]);
+    }, [processedProjects]);
 
-    // Filtrar colunas que têm projetos ou são importantes
+    // Filtrar colunas visíveis
     const visibleColumns = useMemo(() => {
-        // Se estiver vendo arquivados, mostrar APENAS coluna de arquivados
         if (isArchivedView) {
             return KANBAN_COLUMNS.filter(col => col.id === 'archived');
         }
 
         return KANBAN_COLUMNS.filter(col => {
-            // Sempre mostrar colunas principais (exceto arquivados e cancelados)
+            // Sempre mostrar colunas principais do workflow
             if (['open', 'in_progress', 'in_review', 'completed'].includes(col.id)) {
                 return true;
             }
-
             // Mostrar draft apenas se tiver projetos
             if (col.id === 'draft' && projectsByStatus['draft']?.length > 0) {
                 return true;
             }
-
-            // Nunca mostrar arquivados na view normal (pois já são filtrados)
+            // Não mostrar archived na view normal
             if (col.id === 'archived') {
                 return false;
             }
-
-            // Mostrar outras apenas se tiverem projetos
+            // Mostrar outras colunas se tiverem projetos
             return projectsByStatus[col.id]?.length > 0;
         });
     }, [projectsByStatus, isArchivedView]);
@@ -188,6 +200,7 @@ function ProjectKanban({ projects, onArchive, onUnarchive, isArchivedView = fals
                                             columnColor={column.color}
                                             onArchive={onArchive}
                                             onUnarchive={onUnarchive}
+                                            onOpenBatch={onOpenBatch}
                                         />
                                     ))
                                 )}

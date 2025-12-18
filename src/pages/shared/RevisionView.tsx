@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { VideoPlayer } from '@/components/review/VideoPlayer';
 import { CommentList } from '@/components/review/CommentList';
 import { AddCommentForm } from '@/components/review/AddCommentForm';
+import { ReviewPanel } from '@/components/creator/ReviewPanel'; // 🆕 Import ReviewPanel
 import {
     getDeliveryComments,
     createComment,
@@ -28,6 +29,7 @@ interface DeliveryData {
     id: string;
     project_id: string;
     video_url: string;
+    batch_video_id?: string | null; // 🆕 Added
     video_type: 'youtube' | 'gdrive';
     title: string | null;
     description: string | null;
@@ -82,8 +84,11 @@ export default function RevisionView() {
         try {
             setLoading(true);
 
-            // Buscar entrega pela versão - SEM o join direto com users
-            const { data: deliveryData, error } = await supabase
+            // Buscar versão correta, considerando se é lote ou não
+            const searchParams = new URLSearchParams(window.location.search);
+            const batchVideoId = searchParams.get('video');
+
+            let query = supabase
                 .from('project_deliveries')
                 .select(`
                     *,
@@ -95,8 +100,19 @@ export default function RevisionView() {
                     )
                 `)
                 .eq('project_id', id)
-                .eq('version', parseInt(version!))
-                .single();
+                .eq('version', parseInt(version!));
+
+            // Filtro específico para Lote vs Projeto Único
+            if (batchVideoId) {
+                query = query.eq('batch_video_id', batchVideoId);
+            } else {
+                // Se não tem vídeo id, garante que não pegue entregas de lote perdidas (ou assume single)
+                // Para compatibilidade, se não passar ID, tenta pegar onde batch_video_id é null 
+                // OU aceita qualquer um se não houver conflito (mas melhor ser estrito)
+                query = query.is('batch_video_id', null);
+            }
+
+            const { data: deliveryData, error } = await query.single();
 
             if (error) throw error;
 
@@ -283,7 +299,8 @@ export default function RevisionView() {
     if (!delivery) return null;
 
     const isReadOnly = delivery.status !== 'pending_review';
-    const canComment = !isReadOnly || userType === 'admin';
+    // Permitir se não for admin, ou se for editor trabalhando na revisão
+    const canComment = !isReadOnly || (userType === 'editor' && delivery.status === 'revision_requested') || userType === 'admin';
 
     return (
         <DashboardLayout
@@ -394,6 +411,36 @@ export default function RevisionView() {
                     />
                 </div>
             </div>
+
+            {/* Ações de Revisão (Apenas Creator) */}
+            {userType === 'creator' && delivery.status === 'pending_review' && (
+                <div className="mt-8">
+                    <ReviewPanel
+                        projectId={delivery.project_id}
+                        isBatch={!!delivery.batch_video_id} // Pass correct batch mode
+                        batchVideo={{
+                            id: delivery.batch_video_id || '',
+                            sequence_order: 1, // Fallback if missing
+                            title: delivery.title || delivery.project.title,
+                            revision_count: delivery.version - 1,
+                            paid_extra_revisions: false, // Need to pipe this if relevant
+                        }}
+                        delivery={{
+                            id: delivery.id,
+                            video_url: delivery.video_url,
+                            notes: delivery.description || undefined,
+                            version: delivery.version, // Ensure version is passed if ReviewPanel needs it
+                            delivered_at: delivery.submitted_at
+                        }}
+                        editorEarningsPerVideo={0} // Ocultar ou passar se disponível. ReviewPanel uses it for display messages.
+                        editorName={delivery.editor?.full_name}
+                        onUpdate={() => {
+                            // Reload delivery data to update status
+                            loadDeliveryData();
+                        }}
+                    />
+                </div>
+            )}
         </DashboardLayout>
     );
 }

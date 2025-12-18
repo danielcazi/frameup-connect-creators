@@ -51,9 +51,11 @@ interface ChatProps {
     isAdminView?: boolean;
     projectId?: string;
     isEmbedded?: boolean;
+    readOnly?: boolean; // 🆕 Added prop
 }
 
-function Chat({ isAdminView = false, projectId, isEmbedded = false }: ChatProps) {
+function Chat({ isAdminView = false, projectId, isEmbedded = false, readOnly = false }: ChatProps) {
+
     const { id: paramId } = useParams(); // project_id
     const id = projectId || paramId;
     const { user, userType } = useAuth();
@@ -474,10 +476,19 @@ function Chat({ isAdminView = false, projectId, isEmbedded = false }: ChatProps)
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Message Input - Hide if Admin */}
-                {!isAdminView && (
+                {/* Message Input - Hide if Admin or ReadOnly */}
+                {!isAdminView && !readOnly && (
                     <div className="border-t border-border p-4 bg-card">
                         <MessageInput onSend={handleSendMessage} disabled={sending} />
+                    </div>
+                )}
+
+                {/* Read Only Message */}
+                {readOnly && (
+                    <div className="border-t border-border p-4 bg-muted/30 text-center">
+                        <p className="text-sm text-muted-foreground flex items-center justify-center gap-2">
+                            🔒 Chat pausado durante a revisão
+                        </p>
                     </div>
                 )}
             </Card>

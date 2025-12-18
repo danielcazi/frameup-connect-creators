@@ -113,16 +113,15 @@ function ProjectCard({
 
     // Determinar qual botão mostrar
     function renderActionButton() {
-        // Já se candidatou
         if (hasApplied) {
             return (
                 <Button
-                    variant="secondary"
-                    className="w-full"
+                    variant="outline"
+                    className="w-full border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
                     onClick={onApply}
                 >
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    Ver Detalhes
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Aplicado
                 </Button>
             );
         }
@@ -208,10 +207,9 @@ function ProjectCard({
                     )}
 
                     {hasApplied && !showStatus && (
-                        <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Candidatado
-                        </Badge>
+                        <div className="border border-green-500 text-green-600 dark:text-green-400 px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-green-50 dark:bg-green-900/20">
+                            aplicado
+                        </div>
                     )}
                 </div>
 

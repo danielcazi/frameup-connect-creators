@@ -10,21 +10,52 @@ import {
     Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Project } from '@/utils/projectHelpers';
+import { Project, calculateBatchProgress } from '@/utils/projectHelpers';
+import ProjectBatchCard from './ProjectBatchCard';
 
 interface ProjectKanbanCardProps {
     project: Project;
     columnColor?: string;
     onArchive?: (projectId: string) => void;
     onUnarchive?: (projectId: string) => void;
+    onOpenBatch?: (projectId: string) => void;
 }
 
-const ProjectKanbanCard = ({ project, onArchive, onUnarchive }: ProjectKanbanCardProps) => {
+const ProjectKanbanCard = ({
+    project,
+    columnColor,
+    onArchive,
+    onUnarchive,
+    onOpenBatch
+}: ProjectKanbanCardProps) => {
     const navigate = useNavigate();
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SE FOR PROJETO EM LOTE, RENDERIZAR CARD MÃE
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (project.is_batch && project.batch_videos && project.batch_videos.length > 0 && onOpenBatch) {
+        const progress = calculateBatchProgress(project.batch_videos, project.deadline_days);
+
+        return (
+            <ProjectBatchCard
+                project={project}
+                progress={progress}
+                columnColor={columnColor}
+                onArchive={onArchive}
+                onUnarchive={onUnarchive}
+                onOpenBatch={onOpenBatch}
+            />
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CARD INDIVIDUAL (CÓDIGO ORIGINAL)
+    // ═══════════════════════════════════════════════════════════════════════════
     const applicationCount = project._count?.applications || 0;
     const hasApplications = applicationCount > 0;
 
-    const getDeadlineColor = (days: number) => {
+    const getDeadlineColor = (days: number | undefined) => {
+        if (days === undefined) return 'text-gray-500';
         if (days < 0) return 'text-red-500 font-medium';
         if (days <= 2) return 'text-orange-500 font-medium';
         return 'text-gray-500';
@@ -68,7 +99,7 @@ const ProjectKanbanCard = ({ project, onArchive, onUnarchive }: ProjectKanbanCar
                     icon: MessageSquare,
                 };
             case 'in_review':
-            case 'revision_requested': // Legacy/Fallback
+            case 'revision_requested':
                 return {
                     label: project.status === 'in_review' ? 'Revisar Entrega' : 'Ver Revisão',
                     onClick: () => navigate(`/creator/project/${project.id}/review`),
@@ -95,6 +126,7 @@ const ProjectKanbanCard = ({ project, onArchive, onUnarchive }: ProjectKanbanCar
     }
 
     const action = getMainAction();
+    const deadlineColor = getDeadlineColor(project.deadline_days);
 
     return (
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
@@ -106,19 +138,31 @@ const ProjectKanbanCard = ({ project, onArchive, onUnarchive }: ProjectKanbanCar
             </div>
 
             {/* Price and Deadline */}
-            <div className="flex items-center gap-4 text-xs mb-4">
+            <div className="flex items-center gap-2 text-xs mb-4 overflow-hidden">
                 <span className="text-gray-600 dark:text-gray-400 font-medium">
                     {formatCurrency(project.base_price)}
                 </span>
-                <span className={`flex items-center gap-1 ${getDeadlineColor(project.deadline_days)}`}>
+
+                <span className={`flex items-center gap-1 ${deadlineColor}`}>
                     <Calendar className="w-3 h-3" />
-                    {project.deadline_days < 0
-                        ? `${Math.abs(project.deadline_days)}d atrasado`
-                        : `${project.deadline_days}d`
+                    {project.deadline_days !== undefined
+                        ? (project.deadline_days < 0
+                            ? `${Math.abs(project.deadline_days)}d atrasado`
+                            : `${project.deadline_days}d`
+                        )
+                        : 'Sem prazo'
                     }
                 </span>
+
+                {project.status === 'open' && hasApplications && (
+                    <span className="bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded-full text-green-700 dark:text-green-300 font-medium flex items-center gap-1.5 border border-green-100 dark:border-green-800">
+                        <Users className="w-3 h-3" />
+                        {applicationCount}
+                    </span>
+                )}
+
                 {project.batch_quantity && project.batch_quantity > 1 && (
-                    <span className="text-gray-500 flex items-center gap-1">
+                    <span className="bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded-full text-gray-600 dark:text-gray-400 flex items-center gap-1.5 border border-gray-100 dark:border-gray-700">
                         <Layers className="w-3 h-3" />
                         {project.batch_quantity}
                     </span>
@@ -128,16 +172,16 @@ const ProjectKanbanCard = ({ project, onArchive, onUnarchive }: ProjectKanbanCar
             {/* Actions */}
             <div className="flex items-center gap-2 mt-auto pt-2 border-t border-gray-100 dark:border-gray-700">
                 <Button
-                    variant="secondary"
+                    variant={action.variant}
                     size="sm"
-                    className="flex-1 h-8 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 border-0"
-                    onClick={() => navigate(`/creator/project/${project.id}`)}
+                    className="flex-1 h-8 text-xs"
+                    onClick={action.onClick}
                 >
-                    <Eye className="w-3 h-3 mr-1.5" />
-                    Ver Detalhes
+                    {action.icon && <action.icon className="w-3 h-3 mr-1.5" />}
+                    {action.label}
                 </Button>
 
-                {/* Archive/Unarchive Action */}
+                {/* Archive/Unarchive */}
                 {project.is_archived && onUnarchive && (
                     <Button
                         variant="ghost"

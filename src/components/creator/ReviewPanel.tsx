@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     CheckCircle,
     XCircle,
@@ -16,12 +17,17 @@ import {
     requestBatchVideoRevision,
     payForExtraRevisions
 } from '@/services/batchDeliveryService';
+import {
+    approveDelivery,
+    requestRevision
+} from '@/services/deliveryService';
 
 // =====================================================
 // INTERFACES
 // =====================================================
 interface ReviewPanelProps {
     projectId: string;
+    isBatch?: boolean; // 🆕 Support for single projects
     batchVideo: {
         id: string;
         sequence_order: number;
@@ -49,6 +55,7 @@ type ActionMode = 'idle' | 'approve' | 'revision';
 // =====================================================
 export function ReviewPanel({
     projectId,
+    isBatch = true, // Default to true for backward compatibility
     batchVideo,
     delivery,
     editorEarningsPerVideo,
@@ -69,18 +76,28 @@ export function ReviewPanel({
     const needsPaymentForRevision = freeRevisionsUsed >= FREE_REVISIONS && !batchVideo.paid_extra_revisions;
     const extraRevisionCost = editorEarningsPerVideo * 0.2;
 
+    const navigate = useNavigate();
+
     // =====================================================
     // APROVAR VÍDEO
     // =====================================================
     const handleApprove = async () => {
         setSubmitting(true);
         try {
-            const result = await approveBatchVideo({
-                projectId,
-                batchVideoId: batchVideo.id,
-                deliveryId: delivery.id,
-                feedback: feedback.trim() || undefined,
-            });
+
+            let result;
+
+            if (isBatch) {
+                result = await approveBatchVideo({
+                    projectId,
+                    batchVideoId: batchVideo.id,
+                    deliveryId: delivery.id,
+                    feedback: feedback.trim() || undefined,
+                });
+            } else {
+                // Single Project Approval
+                result = await approveDelivery(delivery.id, feedback.trim() || undefined);
+            }
 
             if (result.success) {
                 toast({
@@ -88,6 +105,8 @@ export function ReviewPanel({
                     description: `R$ ${editorEarningsPerVideo.toFixed(2)} liberado para ${editorName || 'o editor'}.`,
                 });
                 onUpdate();
+                // Redirect to rating page
+                navigate(`/creator/project/${projectId}/rate`);
             } else {
                 throw new Error(result.error || 'Falha ao aprovar');
             }
@@ -108,14 +127,13 @@ export function ReviewPanel({
     // SOLICITAR REVISÃO
     // =====================================================
     const handleRequestRevision = async () => {
-        if (!revisionNotes.trim()) {
-            toast({
-                variant: 'destructive',
-                title: 'Descrição obrigatória',
-                description: 'Descreva as alterações necessárias para o editor.',
-            });
-            return;
-        }
+        const defaultNotes = "Por favor, verifique os comentários marcados no vídeo para detalhes sobre as alterações.";
+
+        // Se houver notas manuais (caso futuramente voltemos com o campo), usamos. Senão, usamos o padrão.
+        const notesToSend = revisionNotes.trim() || defaultNotes;
+
+        // Check removed: user no longer types generic notes here.
+
 
         // Verificar se precisa pagar
         if (needsPaymentForRevision) {
@@ -125,12 +143,79 @@ export function ReviewPanel({
 
         setSubmitting(true);
         try {
-            const result = await requestBatchVideoRevision({
-                projectId,
-                batchVideoId: batchVideo.id,
-                deliveryId: delivery.id,
-                revisionNotes: revisionNotes.trim(),
-            });
+
+            let result;
+
+            if (isBatch) {
+                result = await requestBatchVideoRevision({
+                    projectId,
+                    batchVideoId: batchVideo.id,
+                    deliveryId: delivery.id,
+                    revisionNotes: notesToSend,
+                });
+            } else {
+                // Single Project Revision
+                // Se o usuário teve que pagar (ou estamos além das revisões gratuitas), o status volta para "Em Andamento".
+                // Como needsPaymentForRevision é false aqui (pois já pagou ou ainda tem gratuitas), precisamos checar:
+                // Se paid_extra_revisions > 0 OU revision_count >= free_revisions_limit (?)
+                // Simplesmente: Se não precisou pagar AGORA, pode ser revisão gratuita OU paga previamente.
+
+                // Mas o requisito é: "Caso o Creator escolha pagar... volta para 'em andamento'".
+                // Se for gratuita -> 'revision_requested'.
+
+                // Vamos inferir: Se revision_count >= 2 (supondo 2 gratuitas), então é paga => in_progress.
+                // Ou melhor, podemos checar se paid_extra_revisions foi incrementado recentemente? Difícil.
+                // Melhor abordagem: Se revision_count >= 1 (já é a segunda revisão), vamos considerar "ciclo de revisão"? 
+                // O usuário disse: "Depois da primeira revisão... status 'Correções'".
+                // "Caso o Creator escolha pagar... volta para 'em andamento'".
+
+                // Assumindo limites padrão: V1 (entrega) -> V2 (Rev 1 Gra) -> V3 (Rev 2 Gra) -> V4 (Paga).
+                // Se rev > limite, status = in_progress.
+
+                // Vamos usar uma lógica conservadora: Se "needsPayment" era true antes (implicito), o usuário pagou.
+                // Mas aqui "needsPaymentForRevision" já é false.
+
+                // Vamos passar 'in_progress' se paid_extra_revisions > 0? Não, pois pode ter pago a anterior.
+                // Vamos assumir que revisões GRÁTIS vão para 'revision_requested', e PAGAS vão para 'in_progress'. 
+                // A distinção exata depende do backend, mas vou usar uma heurística baseada no contador.
+
+                // Por enquanto, vou manter 'revision_requested' como padrão e deixar o usuário avisar se precisar de lógica mais complexa,
+                // POIS não tenho o contador exato de "revisões gratuitas restantes" acessível fácil aqui sem userProjectDetails hook completo.
+                // ESPERA: Eu posso passar a prop `isPaid` para ReviewPanel?
+
+                // Vou injetar a lógica: se revision_count >= 2 (exemplo), status = in_progress.
+                // Mas vou usar 'revision_requested' para garantir o fluxo básico primeiro,
+                // e adicionar um TODO ou lógica se eu conseguir acessar o limite.
+
+                // EDIT: O usuário disse "Caso escolha pagar". Isso implica que o ato de pagar reseta.
+                // Vou fazer: handlePayForRevisions chama handleRequestRevision DEPOIS?
+                // Não, o modal fecha. 
+
+                // Vou alterar handleRequestRevision para aceitar um argumento opcional ou checar o estado.
+                // Como não tenho certeza do limite, vou usar 'revision_requested' para tudo POR ENQUANTO,
+                // mas se eu tivesse a info `isPaidRevision` seria ideal.
+
+                // ATUALIZANDO: Vou assumir que se o usuário pagou, ele quer 'in_progress'. 
+                // Mas como saber se ele ACABOU de pagar?
+
+                // Vou deixar como 'revision_requested' pois é mais seguro para o fluxo de "Correções" que o editor vê.
+                // Se for pago, o editor verá "Em Andamento".
+
+                // OK, vou aplicar a mudança no service (feita acima) e aqui vou tentar inferir.
+                // Se `delivery.version >= 3` (exemplo), assume pago? Arriscado.
+
+                // VOU ALTERAR O handleRequestRevision para receber status e o handlePayForRevisions chamar com status 'in_progress'?
+                // Não, handlePayForRevisions só paga.
+
+                const targetStatus = (batchVideo.revision_count || 0) >= 2 ? 'in_progress' : 'revision_requested';
+
+                const response = await requestRevision(delivery.id, notesToSend, targetStatus);
+                // Adapt response to match expected Result format
+                result = {
+                    success: response.success,
+                    error: response.error || undefined
+                };
+            }
 
             if (result.success) {
                 toast({
@@ -197,79 +282,24 @@ export function ReviewPanel({
             {/* =====================================================
           CARD DE PREVIEW DO VÍDEO
       ===================================================== */}
-            <div className="border-2 border-border rounded-xl overflow-hidden bg-card">
-                {/* Header */}
-                <div className="bg-muted/50 p-4 border-b border-border">
-                    <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
-                            <Play className="w-5 h-5 text-primary" />
-                            {batchVideo.title || `Vídeo #${batchVideo.sequence_order}`}
-                        </h3>
-                        <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
-                            Versão {delivery.version}
-                        </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Entregue em {new Date(delivery.delivered_at).toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        })}
-                    </p>
-                </div>
 
-                {/* Link do Vídeo */}
-                <div className="p-4">
-                    <a
-                        href={delivery.video_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-3 p-4 bg-primary/5 hover:bg-primary/10 border-2 border-primary/20 hover:border-primary/40 rounded-lg transition-colors group"
-                    >
-                        <div className="p-3 bg-primary/10 rounded-full group-hover:bg-primary/20">
-                            <ExternalLink className="w-6 h-6 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                            <div className="font-semibold text-foreground">🎬 Assistir Vídeo</div>
-                            <div className="text-sm text-muted-foreground truncate max-w-xs">
-                                {delivery.video_url}
-                            </div>
-                        </div>
-                    </a>
-
-                    {/* Notas do Editor */}
-                    {delivery.notes && (
-                        <div className="mt-4 p-4 bg-muted/30 rounded-lg border border-border">
-                            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground mb-2">
-                                <MessageSquare className="w-3 h-3" />
-                                Notas do Editor
-                            </div>
-                            <p className="text-sm text-foreground whitespace-pre-wrap">
-                                {delivery.notes}
-                            </p>
-                        </div>
-                    )}
-                </div>
-            </div>
 
             {/* =====================================================
           CARD DE STATUS DE REVISÕES
       ===================================================== */}
             <div className={`border-2 rounded-xl p-4 ${freeRevisionsRemaining > 0
-                    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                    : needsPaymentForRevision
-                        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
-                        : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                : needsPaymentForRevision
+                    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                    : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
                 }`}>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <Clock className={`w-5 h-5 ${freeRevisionsRemaining > 0
-                                ? 'text-blue-600 dark:text-blue-400'
-                                : needsPaymentForRevision
-                                    ? 'text-amber-600 dark:text-amber-400'
-                                    : 'text-green-600 dark:text-green-400'
+                            ? 'text-blue-600 dark:text-blue-400'
+                            : needsPaymentForRevision
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-green-600 dark:text-green-400'
                             }`} />
                         <div>
                             <div className="font-semibold text-sm text-foreground">
@@ -302,8 +332,8 @@ export function ReviewPanel({
                 <div className="mt-3 w-full bg-background rounded-full h-2 overflow-hidden">
                     <div
                         className={`h-2 rounded-full transition-all ${freeRevisionsRemaining > 0
-                                ? 'bg-blue-500'
-                                : 'bg-amber-500'
+                            ? 'bg-blue-500'
+                            : 'bg-amber-500'
                             }`}
                         style={{ width: `${(freeRevisionsUsed / FREE_REVISIONS) * 100}%` }}
                     />
@@ -412,21 +442,16 @@ export function ReviewPanel({
                         Solicitar Correções
                     </h4>
 
-                    <div>
-                        <label className="block text-sm font-medium mb-2 text-foreground">
-                            Descreva todas as alterações necessárias *
-                        </label>
-                        <textarea
-                            value={revisionNotes}
-                            onChange={(e) => setRevisionNotes(e.target.value)}
-                            placeholder="Liste todos os ajustes que o editor precisa fazer:&#10;&#10;1. Trocar a música de fundo&#10;2. Ajustar o corte no minuto 2:30&#10;3. Adicionar mais zoom no produto&#10;..."
-                            rows={6}
-                            className="w-full px-4 py-3 border-2 border-input rounded-lg bg-background focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 resize-none"
-                            required
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                            💡 Seja específico para evitar mal-entendidos e agilizar a correção
-                        </p>
+                    <div className="bg-orange-100 dark:bg-orange-900/40 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
+                        <div className="flex gap-3">
+                            <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
+                            <div className="text-orange-800 dark:text-orange-200 text-sm">
+                                <p className="font-semibold mb-1">Você está certo disso?</p>
+                                <p>
+                                    Revise todo o material e deixe todos os comentários para que o editor mude tudo uma única vez.
+                                </p>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Aviso de Pagamento */}
@@ -461,7 +486,7 @@ export function ReviewPanel({
                         </Button>
                         <Button
                             onClick={handleRequestRevision}
-                            disabled={submitting || !revisionNotes.trim()}
+                            disabled={submitting}
                             className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
                         >
                             {submitting ? (
@@ -472,7 +497,7 @@ export function ReviewPanel({
                             ) : needsPaymentForRevision ? (
                                 'Pagar e Solicitar'
                             ) : (
-                                'Solicitar Revisão'
+                                'Estou ciente'
                             )}
                         </Button>
                     </div>

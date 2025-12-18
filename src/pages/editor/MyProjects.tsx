@@ -1,43 +1,56 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, FolderOpen, LayoutGrid, List, Archive, ArchiveRestore, Users } from 'lucide-react';
+import { Search, Archive, LayoutGrid, List } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import ProjectCard from '@/components/editor/ProjectCard';
 import ProjectKanban from '@/components/editor/ProjectKanban';
+import BatchVideoKanban from '@/components/editor/BatchVideoKanban';
 import EmptyState from '@/components/common/EmptyState';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/useDebounce';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface BatchVideo {
+    id: string;
+    project_id: string;
+    sequence_order: number;
+    title: string;
+    status: string;
+    revision_count?: number;
+    delivery_url?: string;
+}
 
 interface Project {
     id: string;
     title: string;
-    description: string;
-    video_type: string;
-    editing_style: string;
-    duration_category: string;
+    status: string;
     base_price: number;
     deadline_days: number;
     created_at: string;
-    status: string;
     is_archived?: boolean;
-    users: {
+    is_batch?: boolean;
+    batch_quantity?: number;
+    batch_videos?: BatchVideo[];
+    revision_count?: number;
+    users?: {
+        id: string;
         full_name: string;
         username: string;
         profile_photo_url?: string;
     };
-    _count?: {
-        applications: number;
-    };
 }
 
-type ViewMode = 'list' | 'kanban';
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE PRINCIPAL
+// ═══════════════════════════════════════════════════════════════════════════════
 
 const EditorMyProjects = () => {
     const navigate = useNavigate();
@@ -45,37 +58,21 @@ const EditorMyProjects = () => {
     const { toast } = useToast();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
-    const [statusFilter, setStatusFilter] = useState('all');
+    const [sortBy, setSortBy] = useState('recent');
     const [searchTerm, setSearchTerm] = useState('');
-    const [viewMode, setViewMode] = useState<ViewMode>('kanban');
-    const [groupByClient, setGroupByClient] = useState(false);
     const [showArchived, setShowArchived] = useState(false);
     const debouncedSearch = useDebounce(searchTerm, 500);
 
-    // Filtragem client-side para arquivados
-    const filteredProjects = projects.filter(project => {
-        const isArchived = project.is_archived === true;
-        if (showArchived) return isArchived;
-        return !isArchived;
-    });
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ESTADO PARA CONTROLE DA VIEW DE LOTE (IGUAL AO CREATOR)
+    // ═══════════════════════════════════════════════════════════════════════════
+    const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
 
-    // Mapeamento para Kanban (se arquivado, força status visual 'archived')
-    const displayProjects = filteredProjects.map(p =>
-        (showArchived && p.is_archived) ? { ...p, status: 'archived' } : p
-    );
-
-    // Ordenação dos projetos para a visualização em lista
-    const sortedProjects = [...displayProjects].sort((a, b) => {
-        const isAInProgress = a.status === 'in_progress';
-        const isBInProgress = b.status === 'in_progress';
-
-        if (isAInProgress && !isBInProgress) return -1;
-        if (!isAInProgress && isBInProgress) return 1;
-
-        const dateA = new Date(a.created_at).getTime();
-        const dateB = new Date(b.created_at).getTime();
-        return dateB - dateA;
-    });
+    // Projeto selecionado (para view do lote)
+    const selectedBatchProject = useMemo(() => {
+        if (!selectedBatchId) return null;
+        return projects.find(p => p.id === selectedBatchId) || null;
+    }, [selectedBatchId, projects]);
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -87,51 +84,72 @@ const EditorMyProjects = () => {
         if (user) {
             fetchMyProjects();
         }
-    }, [user, statusFilter, debouncedSearch, showArchived]);
+    }, [user, sortBy, debouncedSearch, showArchived]);
 
-    // Refetch quando mudar o modo de visualização
-    useEffect(() => {
-        if (user && viewMode === 'kanban') {
-            setStatusFilter('all');
-        }
-    }, [viewMode]);
-
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FETCH PROJECTS COM BATCH_VIDEOS
+    // ═══════════════════════════════════════════════════════════════════════════
     const fetchMyProjects = async () => {
         if (!user) return;
 
         setLoading(true);
         try {
-            let query = supabase
+            // Query única com todos os dados necessários
+            const { data, error } = await supabase
                 .from('projects')
                 .select(`
-          *,
-          users:creator_id (
-            full_name,
-            username,
-            profile_photo_url
-          )
-        `)
-                .eq('assigned_editor_id', user.id);
-
-            // Filtro de status apenas no modo lista e se não estiver vendo arquivados
-            if (statusFilter !== 'all' && viewMode === 'list' && !showArchived) {
-                query = query.eq('status', statusFilter);
-            }
-
-            if (debouncedSearch) {
-                query = query.ilike('title', `%${debouncedSearch}%`);
-            }
-
-            const { data, error } = await query;
+                    id,
+                    title,
+                    status,
+                    base_price,
+                    deadline_days,
+                    created_at,
+                    is_archived,
+                    is_batch,
+                    batch_quantity,
+                    users:creator_id (
+                        id,
+                        full_name,
+                        username,
+                        profile_photo_url
+                    ),
+                    batch_videos (
+                        id,
+                        project_id,
+                        sequence_order,
+                        title,
+                        status,
+                        revision_count,
+                        delivery_url
+                    )
+                `)
+                .eq('assigned_editor_id', user.id)
+                .order('created_at', { ascending: sortBy === 'oldest' });
 
             if (error) throw error;
 
-            setProjects(data || []);
+            // Filtrar por busca no frontend (mais rápido para poucos projetos)
+            let filteredData = data || [];
+            if (debouncedSearch) {
+                const searchLower = debouncedSearch.toLowerCase();
+                filteredData = filteredData.filter(p =>
+                    p.title.toLowerCase().includes(searchLower)
+                );
+            }
+
+            // Ordenar batch_videos (o Supabase pode não garantir a ordem no join aninhado dependendo da versão, mas podemos garantir aqui ou tentar no select)
+            // Para garantir:
+            const projectsWithSortedVideos = filteredData.map(p => ({
+                ...p,
+                batch_videos: p.batch_videos?.sort((a: BatchVideo, b: BatchVideo) => a.sequence_order - b.sequence_order) || []
+            }));
+
+            setProjects(projectsWithSortedVideos);
         } catch (error) {
             console.error('Error fetching projects:', error);
             toast({
                 title: "Erro ao carregar projetos",
-                description: "Não foi possível carregar seus projetos. Tente novamente.",
+                description: "Não foi possível carregar seus projetos.",
                 variant: "destructive"
             });
         } finally {
@@ -139,64 +157,30 @@ const EditorMyProjects = () => {
         }
     };
 
-    const onArchive = async (projectId: string) => {
-        // Optimistic update
-        setProjects(prev => prev.map(p =>
-            p.id === projectId ? { ...p, is_archived: true } : p
-        ));
-
-        toast({
-            title: "Projeto arquivado",
-            description: "O projeto foi movido para a lista de arquivados.",
-        });
-
-        const { error } = await supabase
-            .from('projects')
-            .update({ is_archived: true })
-            .eq('id', projectId);
-
-        if (error) {
-            // Revert
-            setProjects(prev => prev.map(p =>
-                p.id === projectId ? { ...p, is_archived: false } : p
-            ));
-            toast({
-                title: "Erro ao arquivar",
-                description: "Não foi possível arquivar o projeto.",
-                variant: "destructive"
-            });
-        }
+    // ═══════════════════════════════════════════════════════════════════════════
+    // HANDLERS PARA NAVEGAÇÃO DO LOTE
+    // ═══════════════════════════════════════════════════════════════════════════
+    const handleOpenBatch = (batchId: string) => {
+        setSelectedBatchId(batchId);
     };
 
-    const onUnarchive = async (projectId: string) => {
-        // Optimistic update
-        setProjects(prev => prev.map(p =>
-            p.id === projectId ? { ...p, is_archived: false } : p
-        ));
-
-        toast({
-            title: "Projeto restaurado",
-            description: "O projeto voltou para a lista de ativos.",
-        });
-
-        const { error } = await supabase
-            .from('projects')
-            .update({ is_archived: false })
-            .eq('id', projectId);
-
-        if (error) {
-            // Revert
-            setProjects(prev => prev.map(p =>
-                p.id === projectId ? { ...p, is_archived: true } : p
-            ));
-            toast({
-                title: "Erro ao restaurar",
-                description: "Não foi possível restaurar o projeto.",
-                variant: "destructive"
-            });
-        }
+    const handleBackFromBatch = () => {
+        setSelectedBatchId(null);
     };
 
+    // Filtrar projetos
+    const filteredProjects = projects.filter(project => {
+        const isArchived = project.is_archived === true;
+        if (showArchived) return isArchived;
+        return !isArchived;
+    });
+
+    const displayProjects = filteredProjects.map(p => ({
+        ...p,
+        status: showArchived ? 'archived' : p.status
+    }));
+
+    // Loading de autenticação
     if (authLoading) {
         return (
             <div className="flex min-h-screen items-center justify-center">
@@ -211,201 +195,116 @@ const EditorMyProjects = () => {
     return (
         <DashboardLayout
             userType="editor"
-            title="Meus Projetos"
-            subtitle="Gerencie os projetos em que você está trabalhando"
+            title={selectedBatchProject ? `Projeto: ${selectedBatchProject.title}` : "Meus Projetos"}
+            subtitle={selectedBatchProject
+                ? `${selectedBatchProject.batch_videos?.length || 0} vídeos no lote`
+                : "Gerencie os projetos em que você está trabalhando"
+            }
             headerAction={
-                projects.length > 0 ? (
-                    <Button onClick={() => navigate('/editor/projects')}>
-                        <Search className="w-4 h-4 mr-2" />
+                !selectedBatchId && (
+                    <Button onClick={() => navigate('/editor/find-projects')}>
+                        <Search className="mr-2 h-4 w-4" />
                         Encontrar Projetos
                     </Button>
-                ) : undefined
+                )
             }
         >
-            {/* Filters Section */}
-            <div className="bg-white dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700 mb-6 space-y-4 md:space-y-0 md:flex md:items-center md:justify-between gap-4">
-                <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                        placeholder="Buscar projetos..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
-                        aria-label="Buscar meus projetos"
-                    />
-                </div>
+            {/* ═══════════════════════════════════════════════════════════════════
+                FILTROS - Ocultar quando estiver na view de lote
+            ═══════════════════════════════════════════════════════════════════ */}
+            {!selectedBatchId && (
+                <div className="bg-white dark:bg-gray-900 p-4 rounded-lg border border-gray-200 dark:border-gray-700 mb-6 space-y-4 md:space-y-0 md:flex md:items-center md:justify-between gap-4">
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                            placeholder="Buscar projetos..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10"
+                        />
+                    </div>
 
-                <div className="flex gap-3 w-full md:w-auto items-center">
-                    {/* Botão de Arquivados */}
-                    <Button
-                        variant={showArchived ? "default" : "outline"}
-                        onClick={() => setShowArchived(!showArchived)}
-                        className="gap-2"
-                        size="sm"
-                    >
-                        {showArchived ? (
-                            <>
-                                <FolderOpen className="w-4 h-4" />
-                                Ver Ativos
-                            </>
-                        ) : (
-                            <>
-                                <Archive className="w-4 h-4" />
-                                Arquivados
-                            </>
-                        )}
-                    </Button>
-
-                    {/* Botão Agrupar por Cliente (Apenas lista e não arquivado) */}
-                    {viewMode === 'list' && !showArchived && (
+                    <div className="flex gap-3 w-full md:w-auto items-center">
                         <Button
-                            variant={groupByClient ? "secondary" : "outline"}
-                            onClick={() => setGroupByClient(!groupByClient)}
+                            variant={showArchived ? "default" : "outline"}
+                            onClick={() => setShowArchived(!showArchived)}
                             className="gap-2"
-                            size="sm"
-                            title="Agrupar por cliente"
                         >
-                            <Users className="w-4 h-4" />
-                            <span className="hidden sm:inline">Por Cliente</span>
+                            <Archive className="w-4 h-4" />
+                            {showArchived ? 'Ver Ativos' : 'Arquivados'}
                         </Button>
-                    )}
 
-                    {/* Filtro de Status (oculto no modo Kanban e Arquivados) */}
-                    {viewMode === 'list' && !showArchived && (
-                        <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-full md:w-[180px]">
-                                <div className="flex items-center gap-2">
-                                    <Filter className="h-4 w-4" />
-                                    <SelectValue placeholder="Status" />
-                                </div>
+                        <Select value={sortBy} onValueChange={setSortBy}>
+                            <SelectTrigger className="w-full md:w-[150px]">
+                                <SelectValue placeholder="Ordenar" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">Todos os Status</SelectItem>
-                                <SelectItem value="in_progress">Em Andamento</SelectItem>
-                                <SelectItem value="in_review">Em Revisão</SelectItem>
-                                <SelectItem value="completed">Concluídos</SelectItem>
-                                <SelectItem value="cancelled">Cancelados</SelectItem>
+                                <SelectItem value="recent">Mais Recente</SelectItem>
+                                <SelectItem value="oldest">Mais Antigo</SelectItem>
                             </SelectContent>
                         </Select>
-                    )}
+                    </div>
+                </div>
+            )}
 
-                    {/* Toggle de Visualização */}
-                    <ToggleGroup
-                        type="single"
-                        value={viewMode}
-                        onValueChange={(value) => value && setViewMode(value as ViewMode)}
-                        className="border rounded-lg p-1"
-                    >
-                        <ToggleGroupItem
-                            value="kanban"
-                            aria-label="Visualização Kanban"
-                            className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground px-3"
-                        >
-                            <LayoutGrid className="h-4 w-4" />
-                        </ToggleGroupItem>
-                        <ToggleGroupItem
-                            value="list"
-                            aria-label="Visualização em lista"
-                            className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground px-3"
-                        >
-                            <List className="h-4 w-4" />
-                        </ToggleGroupItem>
-                    </ToggleGroup>
+            {/* Loading State */}
+            {loading && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <Skeleton className="h-5 w-24" />
+                                <Skeleton className="h-6 w-6 rounded-full" />
+                            </div>
+                            <div className="space-y-2">
+                                <Skeleton className="h-24 w-full rounded-lg" />
+                                <Skeleton className="h-24 w-full rounded-lg" />
+                            </div>
+                        </div>
+                    ))}
                 </div>
-            </div>
+            )}
 
-            {/* Projects List/Kanban */}
-            {loading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <Skeleton className="h-64 w-full" />
-                    <Skeleton className="h-64 w-full" />
-                    <Skeleton className="h-64 w-full" />
-                </div>
-            ) : projects.length === 0 ? (
-                <div className="col-span-full">
-                    <EmptyState
-                        illustration="projects"
-                        title={searchTerm ? "Nenhum projeto encontrado" : "Nenhum projeto ativo"}
-                        description={searchTerm ? "Tente buscar com outros termos." : "Você ainda não tem projetos atribuídos. Vá para o Dashboard para encontrar novos projetos."}
-                        action={!searchTerm ? {
-                            label: "Encontrar Projetos",
-                            onClick: () => navigate('/editor/projects'),
-                            variant: "default",
-                        } : undefined}
-                    />
-                </div>
-            ) : (
+            {/* Empty State */}
+            {!loading && !selectedBatchId && filteredProjects.length === 0 && (
+                <EmptyState
+                    illustration="projects"
+                    title={searchTerm
+                        ? "Nenhum projeto encontrado"
+                        : (showArchived ? "Nenhum projeto arquivado" : "Nenhum projeto ainda")
+                    }
+                    description={searchTerm
+                        ? "Tente buscar com outros termos."
+                        : (showArchived
+                            ? "Você não tem projetos arquivados."
+                            : "Candidate-se a projetos para começar a trabalhar."
+                        )
+                    }
+                    action={!searchTerm && !showArchived ? {
+                        label: "Encontrar Projetos",
+                        onClick: () => navigate('/editor/find-projects'),
+                        variant: "default",
+                    } : undefined}
+                />
+            )}
+
+            {/* ═══════════════════════════════════════════════════════════════════
+                VIEWS - Alternar entre view principal e view do lote
+            ═══════════════════════════════════════════════════════════════════ */}
+            {!loading && filteredProjects.length > 0 && (
                 <>
-                    {viewMode === 'list' ? (
-                        <>
-                            {groupByClient && !showArchived ? (
-                                <div className="space-y-8">
-                                    {Object.entries(
-                                        sortedProjects.reduce((acc, project) => {
-                                            const creatorName = project.users.full_name || project.users.username || 'Desconhecido';
-                                            if (!acc[creatorName]) {
-                                                acc[creatorName] = [];
-                                            }
-                                            acc[creatorName].push(project);
-                                            return acc;
-                                        }, {} as Record<string, Project[]>)
-                                    ).map(([clientName, clientProjects]) => (
-                                        <div key={clientName} className="space-y-4">
-                                            <div className="flex items-center gap-3 border-b pb-2">
-                                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold overflow-hidden">
-                                                    {clientProjects[0]?.users.profile_photo_url ? (
-                                                        <img
-                                                            src={clientProjects[0].users.profile_photo_url}
-                                                            alt={clientName}
-                                                            className="h-full w-full object-cover"
-                                                        />
-                                                    ) : (
-                                                        clientName.charAt(0).toUpperCase()
-                                                    )}
-                                                </div>
-                                                <h3 className="font-semibold text-lg">{clientName}</h3>
-                                                <span className="bg-secondary text-secondary-foreground text-xs px-2 py-0.5 rounded-full">
-                                                    {clientProjects.length}
-                                                </span>
-                                            </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                                {clientProjects.map(project => (
-                                                    <ProjectCard
-                                                        key={project.id}
-                                                        project={project}
-                                                        hasApplied={true}
-                                                        canApply={false}
-                                                        hasSubscription={true}
-                                                        onApply={() => navigate(`/editor/project/${project.id}`)}
-                                                        showStatus={true}
-                                                    />
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {sortedProjects.map(project => (
-                                        <ProjectCard
-                                            key={project.id}
-                                            project={project}
-                                            hasApplied={true}
-                                            canApply={false}
-                                            hasSubscription={true}
-                                            onApply={() => navigate(`/editor/project/${project.id}`)}
-                                            showStatus={true}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                        </>
+                    {selectedBatchId && selectedBatchProject ? (
+                        // VIEW DO LOTE
+                        <BatchVideoKanban
+                            project={selectedBatchProject}
+                            onBack={handleBackFromBatch}
+                        />
                     ) : (
+                        // VIEW PRINCIPAL
                         <ProjectKanban
                             projects={displayProjects}
                             isArchivedView={showArchived}
-                            onArchive={onArchive}
-                            onUnarchive={onUnarchive}
+                            onOpenBatch={handleOpenBatch}
                         />
                     )}
                 </>

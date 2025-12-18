@@ -114,17 +114,22 @@ export function ProjectMaterialCard({
                                 </div>
                                 <div className="text-xs text-muted-foreground space-y-1">
                                     {referenceLinks.split('\n').filter(Boolean).map((link, i) => {
-                                        // Verificar se é uma URL válida
-                                        const isUrl = link.startsWith('http://') || link.startsWith('https://');
+                                        // Verificar se é uma URL válida (melhorada)
+                                        const trimmedLink = link.trim();
+                                        const isUrl = trimmedLink.match(/^(https?:\/\/|www\.)/i);
+                                        // Ensure generic text that looks like a domain becomes a link if needed, but safe regex is better
+
+                                        const finalHref = trimmedLink.startsWith('www.') ? `https://${trimmedLink}` : trimmedLink;
+
                                         return isUrl ? (
                                             <a
                                                 key={i}
-                                                href={link}
+                                                href={finalHref}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="block text-primary hover:underline truncate"
                                             >
-                                                {link}
+                                                {trimmedLink}
                                             </a>
                                         ) : (
                                             <p key={i} className="text-muted-foreground">

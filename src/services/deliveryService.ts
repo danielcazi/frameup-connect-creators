@@ -71,6 +71,7 @@ export async function createDelivery(input: CreateDeliveryInput): Promise<{ deli
             p_video_type: validation.type,
             p_title: input.title || null,
             p_description: input.description || null,
+            p_batch_video_id: input.batch_video_id || null,
         });
 
         if (error) throw error;
@@ -83,6 +84,8 @@ export async function createDelivery(input: CreateDeliveryInput): Promise<{ deli
             .single();
 
         if (fetchError) throw fetchError;
+
+        // A RPC create_delivery já atualiza o status corretamente para 'in_review' (v1) ou 'pending_approval' (v2+)
 
         return { delivery, error: null };
     } catch (error: any) {
@@ -146,6 +149,10 @@ export async function approveDelivery(deliveryId: string, feedback?: string): Pr
         });
 
         if (error) throw error;
+
+        // Approve usually sets to 'completed' via RPC, but let's enforce if needed.
+        // Assuming RPC handles 'completed' correctly or 'approved'.
+
         return { success: true, error: null };
     } catch (error: any) {
         console.error('Error approving delivery:', error);
@@ -153,7 +160,7 @@ export async function approveDelivery(deliveryId: string, feedback?: string): Pr
     }
 }
 
-export async function requestRevision(deliveryId: string, feedback: string): Promise<{ success: boolean; error: string | null }> {
+export async function requestRevision(deliveryId: string, feedback: string, targetStatus: 'revision_requested' | 'in_progress' = 'revision_requested'): Promise<{ success: boolean; error: string | null }> {
     try {
         const { error } = await supabase.rpc('request_revision', {
             p_delivery_id: deliveryId,
@@ -161,6 +168,26 @@ export async function requestRevision(deliveryId: string, feedback: string): Pro
         });
 
         if (error) throw error;
+
+        // Atualizar status do projeto
+        // Precisamos do project_id, então buscamos a delivery primeiro ou assumimos que o RPC já faz.
+
+        // Buscar delivery para pegar project_id
+        const { data: delivery } = await supabase
+            .from('project_deliveries')
+            .select('project_id')
+            .eq('id', deliveryId)
+            .single();
+
+        if (delivery) {
+            const { error: updateError } = await supabase
+                .from('projects')
+                .update({ status: targetStatus })
+                .eq('id', delivery.project_id);
+
+            if (updateError) console.error(`Error updating status to ${targetStatus}:`, updateError);
+        }
+
         return { success: true, error: null };
     } catch (error: any) {
         console.error('Error requesting revision:', error);

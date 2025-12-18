@@ -206,18 +206,14 @@ export async function approveBatchVideo({
             throw new Error('Vídeo não encontrado');
         }
 
-        // 3. Atualizar delivery para aprovado
-        const { error: deliveryError } = await supabase
-            .from('project_deliveries')
-            .update({
-                status: 'approved',
-                feedback: feedback || null,
-                approved_at: new Date().toISOString(),
-                approved_by: user.id,
-            })
-            .eq('id', deliveryId);
+        // 3. Atualizar delivery usando RPC (para garantir permissões e campos corretos)
+        const { error: deliveryError } = await supabase.rpc('approve_delivery', {
+            p_delivery_id: deliveryId,
+            p_feedback: feedback || null
+        });
 
         if (deliveryError) {
+            console.error('Erro no RPC approve_delivery:', deliveryError);
             throw new Error('Erro ao atualizar entrega');
         }
 
@@ -384,18 +380,14 @@ export async function requestBatchVideoRevision({
             };
         }
 
-        // 3. Atualizar delivery
-        const { error: deliveryError } = await supabase
-            .from('project_deliveries')
-            .update({
-                status: 'revision_requested',
-                revision_notes: revisionNotes,
-                revision_requested_at: new Date().toISOString(),
-                revision_requested_by: user.id,
-            })
-            .eq('id', deliveryId);
+        // 3. Atualizar delivery usando RPC (para garantir permissões e campos corretos)
+        const { error: deliveryError } = await supabase.rpc('request_revision', {
+            p_delivery_id: deliveryId,
+            p_feedback: revisionNotes
+        });
 
         if (deliveryError) {
+            console.error('Erro no RPC request_revision:', deliveryError);
             throw new Error('Erro ao registrar solicitação');
         }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
@@ -10,7 +10,19 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, Send, Loader2, AlertCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    AlertTriangle,
+    Send,
+    Loader2,
+    AlertCircle,
+    Youtube,
+    HardDrive,
+    CheckCircle,
+    Video,
+    Link as LinkIcon
+} from 'lucide-react';
 
 interface Project {
     id: string;
@@ -35,14 +47,61 @@ const CONTACT_PATTERNS = {
     telegram: /\b(telegram|@\w+_bot)\b/gi,
 };
 
+// Interface para validação de URL de vídeo
+interface VideoUrlValidation {
+    isValid: boolean;
+    type: 'youtube' | 'gdrive' | null;
+    error?: string;
+}
+
+// Função para validar e detectar tipo de URL de vídeo
+function validateVideoUrl(url: string): VideoUrlValidation {
+    if (!url || url.trim() === '') {
+        return { isValid: true, type: null }; // Campo opcional - vazio é válido
+    }
+
+    const trimmedUrl = url.trim();
+
+    // YouTube
+    if (trimmedUrl.includes('youtube.com') || trimmedUrl.includes('youtu.be')) {
+        // Validar formato mais específico
+        const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/|v\/)|youtu\.be\/)[\w-]{11}/;
+        if (youtubeRegex.test(trimmedUrl)) {
+            return { isValid: true, type: 'youtube' };
+        }
+        return { isValid: false, type: null, error: 'URL do YouTube inválida. Use o formato: youtube.com/watch?v=...' };
+    }
+
+    // Google Drive
+    if (trimmedUrl.includes('drive.google.com')) {
+        if (trimmedUrl.includes('/folders/')) {
+            return { isValid: false, type: null, error: 'Use o link de um arquivo de vídeo, não de uma pasta' };
+        }
+        if (trimmedUrl.includes('/file/d/')) {
+            return { isValid: true, type: 'gdrive' };
+        }
+        return { isValid: false, type: null, error: 'URL do Google Drive inválida. Use o formato: drive.google.com/file/d/...' };
+    }
+
+    return { isValid: false, type: null, error: 'URL não suportada. Use YouTube ou Google Drive.' };
+}
+
 function ApplicationModal({ project, onClose, onSuccess }: ApplicationModalProps) {
     const { user } = useAuth();
     const { toast } = useToast();
 
     const [message, setMessage] = useState('');
+    const [portfolioVideoUrl, setPortfolioVideoUrl] = useState('');
+    const [videoValidation, setVideoValidation] = useState<VideoUrlValidation>({ isValid: true, type: null });
     const [submitting, setSubmitting] = useState(false);
     const [detectedContacts, setDetectedContacts] = useState<string[]>([]);
     const [showWarning, setShowWarning] = useState(false);
+
+    // Validar URL do vídeo quando mudar
+    useEffect(() => {
+        const validation = validateVideoUrl(portfolioVideoUrl);
+        setVideoValidation(validation);
+    }, [portfolioVideoUrl]);
 
     function detectContacts(text: string): string[] {
         const detected: string[] = [];
@@ -82,7 +141,7 @@ function ApplicationModal({ project, onClose, onSuccess }: ApplicationModalProps
         e.preventDefault();
         if (!user) return;
 
-        // Validações
+        // Validações de mensagem
         if (message.trim().length < 20) {
             toast({
                 variant: 'destructive',
@@ -97,6 +156,16 @@ function ApplicationModal({ project, onClose, onSuccess }: ApplicationModalProps
                 variant: 'destructive',
                 title: 'Erro',
                 description: 'Sua mensagem não pode ter mais de 500 caracteres',
+            });
+            return;
+        }
+
+        // Validação de URL do vídeo
+        if (!videoValidation.isValid) {
+            toast({
+                variant: 'destructive',
+                title: 'Erro',
+                description: videoValidation.error || 'URL do vídeo inválida',
             });
             return;
         }
@@ -117,7 +186,6 @@ function ApplicationModal({ project, onClose, onSuccess }: ApplicationModalProps
         setSubmitting(true);
 
         try {
-            // Usar stored procedure para validação completa
             const userEmail = (user.email || user.user_metadata?.email || '').toLowerCase().trim();
 
             let data, error;
@@ -130,13 +198,13 @@ function ApplicationModal({ project, onClose, onSuccess }: ApplicationModalProps
                         project_id: project.id,
                         editor_id: user.id,
                         message: message.trim(),
+                        portfolio_video_url: portfolioVideoUrl.trim() || null,
                         status: 'pending'
                     })
                     .select()
                     .single();
 
                 if (insertError) {
-                    // If direct insert fails (e.g. RLS), just mock success for testing flow
                     console.warn('Direct insert failed, mocking success for test user:', insertError);
                     data = [{ success: true }];
                     error = null;
@@ -145,10 +213,12 @@ function ApplicationModal({ project, onClose, onSuccess }: ApplicationModalProps
                     error = null;
                 }
             } else {
+                // Usar stored procedure atualizada
                 const result = await supabase.rpc('validate_and_create_application', {
                     p_project_id: project.id,
                     p_editor_id: user.id,
                     p_message: message.trim(),
+                    p_portfolio_video_url: portfolioVideoUrl.trim() || null,
                 });
                 data = result.data;
                 error = result.error;
@@ -182,7 +252,7 @@ function ApplicationModal({ project, onClose, onSuccess }: ApplicationModalProps
 
     return (
         <Dialog open={true} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Candidatar-se ao Projeto</DialogTitle>
                 </DialogHeader>
@@ -204,9 +274,66 @@ function ApplicationModal({ project, onClose, onSuccess }: ApplicationModalProps
                         <ul className="space-y-1 text-sm text-muted-foreground">
                             <li>• Demonstre interesse genuíno no projeto</li>
                             <li>• Mencione sua experiência relevante</li>
-                            <li>• Destaque seu diferencial</li>
+                            <li>• <strong className="text-foreground">Envie um vídeo similar ao estilo do projeto</strong></li>
                             <li>• Seja profissional e educado</li>
                         </ul>
+                    </div>
+
+                    {/* 🆕 Campo de URL do Vídeo de Portfólio */}
+                    <div className="space-y-2">
+                        <Label htmlFor="portfolioVideo" className="flex items-center gap-2">
+                            <Video className="w-4 h-4 text-primary" />
+                            Link de um Vídeo Similar (Recomendado)
+                        </Label>
+                        <div className="relative">
+                            <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                id="portfolioVideo"
+                                type="url"
+                                placeholder="https://youtube.com/watch?v=... ou drive.google.com/file/d/..."
+                                value={portfolioVideoUrl}
+                                onChange={(e) => setPortfolioVideoUrl(e.target.value)}
+                                className={`pl-10 ${portfolioVideoUrl && !videoValidation.isValid
+                                        ? 'border-red-500 focus:border-red-500'
+                                        : portfolioVideoUrl && videoValidation.isValid && videoValidation.type
+                                            ? 'border-green-500 focus:border-green-500'
+                                            : ''
+                                    }`}
+                            />
+                        </div>
+
+                        {/* Feedback visual da validação */}
+                        {portfolioVideoUrl && (
+                            <div className={`flex items-center gap-2 text-sm ${videoValidation.isValid ? 'text-green-600' : 'text-red-600'
+                                }`}>
+                                {videoValidation.isValid && videoValidation.type ? (
+                                    <>
+                                        <CheckCircle className="h-4 w-4" />
+                                        {videoValidation.type === 'youtube' && (
+                                            <>
+                                                <Youtube className="h-4 w-4" />
+                                                <span>YouTube detectado</span>
+                                            </>
+                                        )}
+                                        {videoValidation.type === 'gdrive' && (
+                                            <>
+                                                <HardDrive className="h-4 w-4" />
+                                                <span>Google Drive detectado</span>
+                                            </>
+                                        )}
+                                    </>
+                                ) : !videoValidation.isValid ? (
+                                    <>
+                                        <AlertCircle className="h-4 w-4" />
+                                        <span>{videoValidation.error}</span>
+                                    </>
+                                ) : null}
+                            </div>
+                        )}
+
+                        <p className="text-xs text-muted-foreground">
+                            💡 Enviar um vídeo similar aumenta suas chances de ser selecionado em até 3x!
+                        </p>
                     </div>
 
                     {/* Message Field */}
@@ -218,7 +345,7 @@ function ApplicationModal({ project, onClose, onSuccess }: ApplicationModalProps
                             value={message}
                             onChange={(e) => handleMessageChange(e.target.value)}
                             placeholder="Escreva uma mensagem apresentando-se e explicando por que você é o editor ideal para este projeto..."
-                            rows={6}
+                            rows={5}
                             maxLength={500}
                             className={`resize-none ${showWarning ? 'border-yellow-300 bg-yellow-50 dark:bg-yellow-900/10' : ''
                                 }`}
@@ -307,7 +434,7 @@ function ApplicationModal({ project, onClose, onSuccess }: ApplicationModalProps
                             type="submit"
                             size="lg"
                             className="w-full"
-                            disabled={submitting || message.trim().length < 20}
+                            disabled={submitting || message.trim().length < 20 || !videoValidation.isValid}
                         >
                             {submitting ? (
                                 <>

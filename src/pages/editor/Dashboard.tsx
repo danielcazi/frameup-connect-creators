@@ -31,7 +31,7 @@ import {
 export default function EditorDashboard() {
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { projects, proposals, loading, error, stats, refresh } = useEditorProjects();
+    const { projects, proposals, applications, loading, error, stats, refresh } = useEditorProjects();
 
     const { subscription } = useSubscription();
 
@@ -226,28 +226,69 @@ export default function EditorDashboard() {
                 {/* 2. Main Content Grid: Active Projects (Left) + Recent Messages (Right) */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-                    {/* Left Column: Em Andamento */}
-                    <div className="lg:col-span-2 space-y-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <ClockIcon className="w-5 h-5 text-primary" />
-                            <h2 className="text-xl font-bold text-foreground">Em Andamento</h2>
+                    {/* Left Column: Em Andamento & Minhas Candidaturas */}
+                    <div className="lg:col-span-2 space-y-8">
+                        {/* Em Andamento */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <ClockIcon className="w-5 h-5 text-primary" />
+                                <h2 className="text-xl font-bold text-foreground">Em Andamento</h2>
+                            </div>
+
+                            {projects.length > 0 ? (
+                                <div className="space-y-4">
+                                    {projects.map(project => (
+                                        <EditorProjectCard
+                                            key={project.id}
+                                            project={project}
+                                            viewMode="list" // List view fits better in column
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-12 bg-muted/20 border border-dashed border-border rounded-xl">
+                                    <p className="text-muted-foreground">
+                                        Nenhum projeto em andamento no momento.
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
-                        {projects.length > 0 ? (
+                        {/* Minhas Candidaturas */}
+                        {applications.length > 0 && (
                             <div className="space-y-4">
-                                {projects.map(project => (
-                                    <EditorProjectCard
-                                        key={project.id}
-                                        project={project}
-                                        viewMode="list" // List view fits better in column
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-12 bg-muted/20 border border-dashed border-border rounded-xl">
-                                <p className="text-muted-foreground">
-                                    Nenhum projeto em andamento no momento.
-                                </p>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Archive className="w-5 h-5 text-primary" />
+                                    <h2 className="text-xl font-bold text-foreground">Minhas Candidaturas ({applications.length})</h2>
+                                </div>
+                                <div className="space-y-4">
+                                    {applications.map(app => {
+                                        // Transform application data to ProjectCard format
+                                        const projectData = {
+                                            ...app.project,
+                                            users: {
+                                                full_name: app.project.creator?.full_name || 'Desconhecido',
+                                                username: app.project.creator?.username || 'user',
+                                                profile_photo_url: app.project.creator?.avatar_url
+                                            },
+                                            _count: {
+                                                applications: 0 // Not needed for this view
+                                            }
+                                        };
+
+                                        return (
+                                            <ProjectCard
+                                                key={app.id}
+                                                project={projectData}
+                                                hasApplied={true}
+                                                canApply={false}
+                                                hasSubscription={!!subscription}
+                                                onApply={() => navigate(`/editor/project/${app.project.id}`)}
+                                                showStatus={false}
+                                            />
+                                        );
+                                    })}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -306,18 +347,23 @@ export default function EditorDashboard() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {marketplaceProjects
                                 .filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase()))
-                                .map(project => (
-                                    <ProjectCard
-                                        key={project.id}
-                                        project={project}
-                                        hasApplied={false} // Simplification for now (requires loadMyApplications)
-                                        canApply={
-                                            currentProjectsCount < (subscription?.subscription_plans.max_simultaneous_projects || 0)
-                                        }
-                                        hasSubscription={!!subscription} // Checks if subscription exists
-                                        onApply={() => navigate(`/editor/project/${project.id}`)}
-                                    />
-                                ))
+                                .map(project => {
+                                    // Verify if already applied
+                                    const hasApplied = applications?.some(app => app.project_id === project.id);
+
+                                    return (
+                                        <ProjectCard
+                                            key={project.id}
+                                            project={project}
+                                            hasApplied={hasApplied}
+                                            canApply={
+                                                currentProjectsCount < (subscription?.subscription_plans.max_simultaneous_projects || 0)
+                                            }
+                                            hasSubscription={!!subscription} // Checks if subscription exists
+                                            onApply={() => navigate(`/editor/project/${project.id}`)}
+                                        />
+                                    );
+                                })
                             }
                         </div>
                     )}

@@ -15,6 +15,11 @@ interface ProjectHeaderProps {
         batch_quantity?: number | null;
         batch_delivery_mode?: 'sequential' | 'simultaneous' | null;
         videos_approved?: number;
+        batch_stats_counts?: {
+            approved: number;
+            delivered: number; // delivered + revision + pending_review
+            in_progress: number;
+        };
         base_price: number;
         deadline_at: string;
         creator_name: string;
@@ -101,7 +106,7 @@ export function ProjectHeader({ project, userRole }: ProjectHeaderProps) {
         : 0;
 
     return (
-        <header className="bg-card border-b-2 border-border sticky top-0 z-20 shadow-sm">
+        <header className="bg-card border-b-2 border-border sticky top-16 z-30 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 py-4">
 
                 {/* Botão Voltar */}
@@ -134,8 +139,8 @@ export function ProjectHeader({ project, userRole }: ProjectHeaderProps) {
                             {/* Badge de Modo */}
                             {project.is_batch && project.batch_delivery_mode && (
                                 <span className={`shrink-0 text-xs px-2.5 py-1 rounded-full font-medium ${project.batch_delivery_mode === 'sequential'
-                                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
                                     }`}>
                                     {project.batch_delivery_mode === 'sequential' ? '📅 Sequencial' : '⚡ Simultâneo'}
                                 </span>
@@ -155,11 +160,28 @@ export function ProjectHeader({ project, userRole }: ProjectHeaderProps) {
                                 <div className="flex items-center gap-2">
                                     <span className="text-muted-foreground">Progresso:</span>
                                     <div className="flex items-center gap-2">
-                                        <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                                        <div className="w-24 h-2 bg-muted rounded-full overflow-hidden flex">
+                                            {/* Aprovados (Verde) */}
                                             <div
-                                                className="h-full bg-green-500 rounded-full transition-all duration-500"
-                                                style={{ width: `${batchProgress}%` }}
+                                                className="h-full bg-green-500"
+                                                style={{ width: `${project.batch_stats_counts ? (project.batch_stats_counts.approved / project.batch_quantity) * 100 : batchProgress}%` }}
                                             />
+
+                                            {/* Em Revisão (Laranja) */}
+                                            {project.batch_stats_counts && project.batch_stats_counts.delivered > 0 && (
+                                                <div
+                                                    className="h-full bg-amber-500"
+                                                    style={{ width: `${(project.batch_stats_counts.delivered / project.batch_quantity) * 100}%` }}
+                                                />
+                                            )}
+
+                                            {/* Em Progresso (Azul) */}
+                                            {project.batch_stats_counts && project.batch_stats_counts.in_progress > 0 && (
+                                                <div
+                                                    className="h-full bg-blue-500"
+                                                    style={{ width: `${(project.batch_stats_counts.in_progress / project.batch_quantity) * 100}%` }}
+                                                />
+                                            )}
                                         </div>
                                         <span className="font-bold text-foreground">
                                             {project.videos_approved || 0}/{project.batch_quantity}

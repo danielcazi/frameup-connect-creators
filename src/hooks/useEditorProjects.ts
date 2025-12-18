@@ -69,9 +69,10 @@ export interface EditorProject {
 export function useEditorProjects() {
     const [projects, setProjects] = useState<EditorProject[]>([]);
     const [proposals, setProposals] = useState<EditorProject[]>([]);
+    const [applications, setApplications] = useState<any[]>([]); // New state for applications
     const [completedCount, setCompletedCount] = useState(0);
     const [applicationsCount, setApplicationsCount] = useState(0);
-    const [completedEarnings, setCompletedEarnings] = useState(0); // Novo estado
+    const [completedEarnings, setCompletedEarnings] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -128,7 +129,34 @@ export function useEditorProjects() {
             }
 
             // =====================================================
-            // 3. BUSCAR ESTATÍSTICAS ADICIONAIS
+            // 3. BUSCAR MINHAS CANDIDATURAS (Nova seção)
+            // =====================================================
+            const { data: appsData, error: appsError } = await supabase
+                .from('project_applications')
+                .select(`
+                    id,
+                    status,
+                    created_at,
+                    project_id,
+                    project:projects (
+                        *,
+                        creator:profiles!creator_id (
+                            full_name,
+                            avatar_url,
+                            username
+                        )
+                    )
+                `)
+                .eq('editor_id', user.id)
+                .neq('status', 'withdrawn') // Optional: hide withdrawn
+                .order('created_at', { ascending: false });
+
+            if (appsError) {
+                console.error('Erro ao buscar candidaturas:', appsError);
+            }
+
+            // =====================================================
+            // 4. BUSCAR ESTATÍSTICAS ADICIONAIS
             // =====================================================
 
             // Buscar projetos concluídos (DADOS COMPLETOS para cálculo de ganhos)
@@ -142,14 +170,12 @@ export function useEditorProjects() {
                 console.error('Erro ao buscar projetos concluídos:', completedError);
             }
 
-            const { count: applications } = await supabase
-                .from('project_applications')
-                .select('*', { count: 'exact', head: true })
-                .eq('editor_id', user.id)
-                .eq('status', 'pending');
+            // Use the fetched applications for the count as well
+            const pendingAppsCount = appsData?.filter(a => a.status === 'pending').length || 0;
 
             setCompletedCount(completedProjects?.length || 0);
-            setApplicationsCount(applications || 0);
+            setApplicationsCount(pendingAppsCount);
+            setApplications(appsData || []);
 
             // Calcular ganhos de projetos concluídos
             const earningsFromCompleted = (completedProjects || []).reduce((acc, p) => {
@@ -159,7 +185,7 @@ export function useEditorProjects() {
             setCompletedEarnings(earningsFromCompleted);
 
             // =====================================================
-            // 4. ENRICHER PROJETOS COM BATCH_VIDEOS
+            // 5. ENRICHER PROJETOS COM BATCH_VIDEOS
             // =====================================================
             const enrichWithBatchVideos = async (projectsList: any[]): Promise<EditorProject[]> => {
                 return Promise.all(
@@ -274,6 +300,7 @@ export function useEditorProjects() {
     return {
         projects,
         proposals,
+        applications, // Return the new state
         loading,
         error,
         stats,

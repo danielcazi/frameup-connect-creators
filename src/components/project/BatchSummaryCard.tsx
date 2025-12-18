@@ -41,11 +41,33 @@ export function BatchSummaryCard({ stats, deliveryMode }: BatchSummaryCardProps)
                     <span>Progresso do Lote</span>
                     <span className="font-bold text-primary">{stats.percentComplete}%</span>
                 </div>
-                <div className="w-full h-3 bg-white/50 dark:bg-black/20 rounded-full overflow-hidden">
-                    <div
-                        className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full transition-all duration-500"
-                        style={{ width: `${stats.percentComplete}%` }}
-                    />
+                <div className="w-full h-3 bg-muted/50 rounded-full overflow-hidden flex">
+                    {/* Aprovados (Verde) */}
+                    {stats.approved > 0 && (
+                        <div
+                            className="h-full bg-green-500 hover:bg-green-600 transition-colors"
+                            style={{ width: `${(stats.approved / stats.total) * 100}%` }}
+                            title={`Aprovados: ${stats.approved}`}
+                        />
+                    )}
+
+                    {/* Aguardando Revisão / Em Revisão (Laranja/Amarelo) */}
+                    {(stats.awaitingReview + stats.inRevision) > 0 && (
+                        <div
+                            className="h-full bg-amber-500 hover:bg-amber-600 transition-colors"
+                            style={{ width: `${((stats.awaitingReview + stats.inRevision) / stats.total) * 100}%` }}
+                            title={`Em Revisão: ${stats.awaitingReview + stats.inRevision}`}
+                        />
+                    )}
+
+                    {/* Em Progresso (Azul) */}
+                    {stats.inProgress > 0 && (
+                        <div
+                            className="h-full bg-blue-500 hover:bg-blue-600 transition-colors"
+                            style={{ width: `${(stats.inProgress / stats.total) * 100}%` }}
+                            title={`Em Progresso: ${stats.inProgress}`}
+                        />
+                    )}
                 </div>
             </div>
 

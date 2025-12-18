@@ -21,7 +21,9 @@ import {
     Loader2,
     ArrowLeft,
     AlertCircle,
+    Video,
 } from 'lucide-react';
+import { VideoPreviewCard } from '@/components/shared/VideoPreviewCard';
 
 interface EditorProfile {
     bio: string;
@@ -37,6 +39,7 @@ interface EditorProfile {
 interface Application {
     id: string;
     message: string;
+    portfolio_video_url?: string;
     status: 'pending' | 'accepted' | 'rejected';
     created_at: string;
     editor: {
@@ -132,6 +135,7 @@ function ProjectApplications() {
                 .select(`
           id,
           message,
+          portfolio_video_url,
           status,
           created_at,
           editor:editor_id (
@@ -510,6 +514,22 @@ function ProjectApplications() {
                                                     </div>
                                                 );
                                             })()}
+
+                                            {/* 🆕 Video Preview - Exibir se tiver vídeo de portfólio */}
+                                            {application.portfolio_video_url && (
+                                                <div className="mb-4">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <Video className="w-4 h-4 text-primary" />
+                                                        <span className="text-sm font-medium text-foreground">
+                                                            Vídeo de Portfólio
+                                                        </span>
+                                                    </div>
+                                                    <VideoPreviewCard
+                                                        url={application.portfolio_video_url}
+                                                        className="w-full h-40"
+                                                    />
+                                                </div>
+                                            )}
 
                                             {/* Message */}
                                             <div className="bg-muted/50 rounded-lg p-4 mb-4 border">

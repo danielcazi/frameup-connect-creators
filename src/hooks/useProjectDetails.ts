@@ -4,6 +4,32 @@ import { supabase } from '@/lib/supabase';
 // =====================================================
 // INTERFACES
 // =====================================================
+export interface EditorProfile {
+    bio: string;
+    city: string;
+    state: string;
+    specialties: string[];
+    software_skills: string[];
+    rating_average: number;
+    total_projects: number;
+    total_reviews: number;
+}
+
+export interface Application {
+    id: string;
+    message: string;
+    portfolio_video_url?: string;
+    status: 'pending' | 'accepted' | 'rejected';
+    created_at: string;
+    editor: {
+        id: string;
+        full_name: string;
+        username: string;
+        profile_photo_url?: string;
+        editor_profiles: EditorProfile | EditorProfile[] | null;
+    };
+}
+
 export interface BatchVideo {
     id: string;
     project_id: string;
@@ -54,6 +80,8 @@ export interface ProjectDetails {
     duration_category: string;
     base_price: number;
     deadline_at: string;
+    current_applications: number; // 🆕 Count of applications
+    recent_applications?: Application[]; // 🆕 Recent applications for preview
 
     // Campos de Lote
     is_batch: boolean;
@@ -92,6 +120,7 @@ export interface ProjectDetails {
     updated_at: string;
     accepted_at: string | null;
     completed_at: string | null;
+    revision_count?: number; // 🆕 Added for single projects
 }
 
 interface UseProjectDetailsReturn {
@@ -168,13 +197,57 @@ export function useProjectDetails(projectId: string): UseProjectDetailsReturn {
                 .from('project_deliveries')
                 .select('*')
                 .eq('project_id', projectId)
-                .order('delivered_at', { ascending: false });
+                .order('created_at', { ascending: false });
 
             if (deliveriesError) {
                 console.error('Erro ao buscar entregas:', deliveriesError);
             }
 
-            // 4. Montar objeto final
+            if (deliveriesError) {
+                console.error('Erro ao buscar entregas:', deliveriesError);
+            }
+
+            // 4. Se não tiver editor, buscar últimas candidaturas
+            let recentApplications: Application[] = [];
+            if (!projectData.assigned_editor_id) {
+                const { data: appsData, error: appsError } = await supabase
+                    .from('project_applications')
+                    .select(`
+                        id,
+                        message,
+                        portfolio_video_url,
+                        status,
+                        created_at,
+                        editor:editor_id (
+                            id,
+                            full_name,
+                            username,
+                            profile_photo_url,
+                            editor_profiles (
+                                bio,
+                                city,
+                                state,
+                                specialties,
+                                software_skills,
+                                rating_average,
+                                total_projects,
+                                total_reviews
+                            )
+                        )
+                    `)
+                    .eq('project_id', projectId)
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+
+                if (appsError) {
+                    console.error('Erro ao buscar candidaturas:', appsError);
+                } else {
+                    // @ts-ignore
+                    recentApplications = appsData || [];
+                }
+            }
+
+            // 5. Montar objeto final
             const enrichedProject: ProjectDetails = {
                 ...projectData,
                 creator_name: projectData.creator?.full_name || 'Cliente',
@@ -183,6 +256,7 @@ export function useProjectDetails(projectId: string): UseProjectDetailsReturn {
                 editor_photo: projectData.editor?.profile_photo_url || null,
                 batch_videos: batchVideos,
                 deliveries: deliveriesData || [],
+                recent_applications: recentApplications,
                 // Garantir valores padrão
                 videos_approved: projectData.videos_approved || 0,
                 editor_earnings_per_video: projectData.editor_earnings_per_video || 0,
@@ -291,9 +365,12 @@ export function getNextVideoToWork(videos: BatchVideo[]): BatchVideo | null {
 }
 
 /**
- * Retorna o próximo vídeo para o cliente revisar
+ * Retorna o próximo vídeo que o cliente deve revisar
+ * Busca vídeos com status 'delivered' que aguardam revisão
  */
 export function getNextVideoToReview(videos: BatchVideo[]): BatchVideo | null {
+    // Status 'delivered' indica que o vídeo foi entregue e aguarda revisão
+    // Conforme documentação: batch_videos.status = 'delivered' após entrega do editor
     return videos.find(v => v.status === 'delivered') || null;
 }
 

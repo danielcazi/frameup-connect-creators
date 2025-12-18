@@ -87,6 +87,7 @@ export interface CreateDeliveryInput {
     video_type: DeliveryVideoType;
     title?: string;
     description?: string;
+    batch_video_id?: string;
 }
 
 export interface CreateCommentInput {
