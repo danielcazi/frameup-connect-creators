@@ -88,8 +88,12 @@
 - [x] **30.3 - Correção de Ganhos:** Cálculo correto de ganhos totais no dashboard do editor.
 
 ### 🔄 Fase 31: Pre-Launch Polish & Deployment (Atual)
-- [ ] Configuração de Environment Variables em Produção
+- [x] Configuração de Environment Variables em Produção
 - [ ] Verificação final de fluxos críticos (Pagamento, Upload, Notificações)
+- [x] Correção de visibilidade de arquivados no Kanban do Editor
+- [x] Correção de versionamento de vídeos em lote
+- [x] Ajuste de fluxo de status de entrega
+- [x] Implementação de Kanban para vídeos em lote (Editor)
 
 ---
 

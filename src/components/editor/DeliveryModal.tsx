@@ -23,6 +23,24 @@ import { Upload, Link as LinkIcon, AlertCircle, Loader2, Layers } from 'lucide-r
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { getVideoPlatform } from '@/constants/videoTypes';
+import { DELIVERY_STATUS, BATCH_VIDEO_STATUS, PROJECT_STATUS } from '@/constants/statusConstants';
+
+// Interfaces for proper typing
+interface BatchVideo {
+    id: string;
+    title: string | null;
+    sequence_order: number;
+    status: string;
+}
+
+interface Project {
+    id: string;
+    title: string;
+    is_batch?: boolean;
+    batch_videos?: BatchVideo[];
+    creator_id: string;
+}
 
 interface DeliveryModalProps {
     isOpen: boolean;
@@ -32,7 +50,7 @@ interface DeliveryModalProps {
     batchVideoId?: string | null;
     currentVersion: number;
     onSuccess: () => void;
-    project?: any; // Passar o projeto completo para ter acesso aos batch_videos
+    project?: Project;
 }
 
 const DeliveryModal = ({
@@ -143,33 +161,17 @@ const DeliveryModal = ({
             // Usar a versão calculada pelo useEffect
             const version = nextVersion;
 
-            // ═══════════════════════════════════════════════════════════════════
-            // CRIAR ENTREGA NA TABELA project_deliveries
-            // ═══════════════════════════════════════════════════════════════════
-
-            // Detectar tipo de vídeo (plataforma) baseado na URL
-            const getVideoPlatform = (url: string) => {
-                if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                    return 'youtube';
-                }
-                return 'gdrive'; // Default para gdrive/outros conforme constraint
-            };
-
-            const deliveryData: any = {
+            const deliveryData = {
                 project_id: projectId,
                 editor_id: user.id,
                 video_url: videoUrl.trim(),
                 description: description.trim() || null,
                 version: version,
                 video_type: getVideoPlatform(videoUrl.trim()),
-                status: 'pending_review',
+                status: DELIVERY_STATUS.PENDING_REVIEW,
                 submitted_at: new Date().toISOString(),
+                batch_video_id: selectedBatchVideoId || null,
             };
-
-            // Adicionar batch_video_id se for entrega de vídeo específico
-            if (selectedBatchVideoId) {
-                deliveryData.batch_video_id = selectedBatchVideoId;
-            }
 
             const { data: delivery, error: deliveryError } = await supabase
                 .from('project_deliveries')
@@ -187,7 +189,7 @@ const DeliveryModal = ({
                 const { error: batchVideoError } = await supabase
                     .from('batch_videos')
                     .update({
-                        status: 'delivered',
+                        status: BATCH_VIDEO_STATUS.DELIVERED,
                         delivery_id: delivery.id,
                         delivery_url: videoUrl.trim(),
                         revision_count: version
@@ -201,7 +203,7 @@ const DeliveryModal = ({
                 // Atualizar o projeto principal (projeto único, não-lote)
                 const { error: projectError } = await supabase
                     .from('projects')
-                    .update({ status: 'delivered' })
+                    .update({ status: PROJECT_STATUS.DELIVERED })
                     .eq('id', projectId);
 
                 if (projectError) {

@@ -9,7 +9,9 @@ import {
     Calendar,
     Eye,
     User,
-    Upload
+    Upload,
+    Archive,
+    ArchiveRestore
 } from 'lucide-react';
 import ProjectBatchCard from './ProjectBatchCard';
 
@@ -44,6 +46,7 @@ interface Project {
     base_price: number;
     deadline_days: number;
     created_at: string;
+    is_archived?: boolean;
     revision_count?: number;
     is_batch?: boolean;
     batch_quantity?: number;
@@ -60,6 +63,8 @@ interface ProjectKanbanCardProps {
     project: Project;
     columnColor?: string;
     onOpenBatch?: (projectId: string) => void;
+    onArchive?: (projectId: string) => void;
+    onUnarchive?: (projectId: string) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -100,7 +105,9 @@ function calculateBatchProgress(batchVideos: BatchVideo[], deadlineDays?: number
 function ProjectKanbanCard({
     project,
     columnColor = '#3B82F6',
-    onOpenBatch
+    onOpenBatch,
+    onArchive,
+    onUnarchive
 }: ProjectKanbanCardProps) {
     const navigate = useNavigate();
 
@@ -116,6 +123,8 @@ function ProjectKanbanCard({
                 progress={progress}
                 columnColor={columnColor}
                 onOpenBatch={onOpenBatch}
+                onArchive={onArchive}
+                onUnarchive={onUnarchive}
             />
         );
     }
@@ -206,11 +215,11 @@ function ProjectKanbanCard({
                 </div>
 
                 {/* Botão de ação */}
-                <div className="pt-2">
+                <div className="pt-2 flex items-center gap-2">
                     <Button
                         variant={needsDelivery ? "default" : "outline"}
                         size="sm"
-                        className="w-full text-xs font-medium h-8"
+                        className="flex-1 text-xs font-medium h-8"
                         style={needsDelivery ? {} : { borderColor: columnColor, color: columnColor }}
                         onClick={(e) => {
                             e.stopPropagation();
@@ -229,6 +238,37 @@ function ProjectKanbanCard({
                             </>
                         )}
                     </Button>
+
+                    {/* Archive/Unarchive */}
+                    {project.is_archived && onUnarchive && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-gray-400 hover:text-green-600 hover:bg-green-50 shrink-0"
+                            title="Desarquivar projeto"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onUnarchive(project.id);
+                            }}
+                        >
+                            <ArchiveRestore className="w-4 h-4" />
+                        </Button>
+                    )}
+
+                    {!project.is_archived && project.status === 'completed' && onArchive && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50 shrink-0"
+                            title="Arquivar projeto"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onArchive(project.id);
+                            }}
+                        >
+                            <Archive className="w-4 h-4" />
+                        </Button>
+                    )}
                 </div>
             </CardContent>
         </Card>

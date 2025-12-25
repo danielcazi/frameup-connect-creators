@@ -8,7 +8,7 @@ export type DeliveryStatus =
     | 'revision_requested'
     | 'cancelled';
 
-export type DeliveryVideoType = 'youtube' | 'gdrive';
+export type DeliveryVideoType = 'youtube' | 'gdrive' | 'vimeo' | 'dropbox';
 
 export type CommentTag =
     | 'correction'

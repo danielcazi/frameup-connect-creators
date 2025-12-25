@@ -13,7 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { VideoPlayer } from '@/components/review/VideoPlayer';
 import { CommentList } from '@/components/review/CommentList';
 import { AddCommentForm } from '@/components/review/AddCommentForm';
-import { ReviewPanel } from '@/components/creator/ReviewPanel'; // 🆕 Import ReviewPanel
+import { ReviewPanel } from '@/components/creator/ReviewPanel';
 import {
     getDeliveryComments,
     createComment,
@@ -24,6 +24,8 @@ import {
     subscribeToDeliveryComments,
 } from '@/services/deliveryService';
 import type { DeliveryComment, CommentTag } from '@/types/delivery';
+import { formatDateTime } from '@/utils/formatters';
+import { DELIVERY_STATUS } from '@/constants/statusConstants';
 
 interface DeliveryData {
     id: string;
@@ -298,9 +300,9 @@ export default function RevisionView() {
 
     if (!delivery) return null;
 
-    const isReadOnly = delivery.status !== 'pending_review';
+    const isReadOnly = delivery.status !== DELIVERY_STATUS.PENDING_REVIEW;
     // Permitir se não for admin, ou se for editor trabalhando na revisão
-    const canComment = !isReadOnly || (userType === 'editor' && delivery.status === 'revision_requested') || userType === 'admin';
+    const canComment = !isReadOnly || (userType === 'editor' && delivery.status === DELIVERY_STATUS.REVISION_REQUESTED) || userType === 'admin';
 
     return (
         <DashboardLayout
@@ -317,15 +319,15 @@ export default function RevisionView() {
                 <div className="flex items-center gap-3">
                     <Badge
                         variant={
-                            delivery.status === 'approved' ? 'default' :
-                                delivery.status === 'revision_requested' ? 'destructive' :
+                            delivery.status === DELIVERY_STATUS.APPROVED ? 'default' :
+                                delivery.status === DELIVERY_STATUS.REVISION_REQUESTED ? 'destructive' :
                                     'secondary'
                         }
                         className="flex items-center gap-1"
                     >
-                        {delivery.status === 'approved' && <><CheckCircle className="h-3 w-3" /> Aprovado</>}
-                        {delivery.status === 'revision_requested' && <><CheckCircle className="h-3 w-3" /> Revisado ✓</>}
-                        {delivery.status === 'pending_review' && <><MessageSquare className="h-3 w-3" /> Em Revisão</>}
+                        {delivery.status === DELIVERY_STATUS.APPROVED && <><CheckCircle className="h-3 w-3" /> Aprovado</>}
+                        {delivery.status === DELIVERY_STATUS.REVISION_REQUESTED && <><CheckCircle className="h-3 w-3" /> Revisado ✓</>}
+                        {delivery.status === DELIVERY_STATUS.PENDING_REVIEW && <><MessageSquare className="h-3 w-3" /> Em Revisão</>}
                     </Badge>
 
                     {isReadOnly && (
@@ -343,13 +345,7 @@ export default function RevisionView() {
                         <h3 className="font-semibold">{delivery.title || `Entrega v${delivery.version}`}</h3>
                         <p className="text-sm text-muted-foreground">
                             Enviado por {delivery.editor?.full_name} em{' '}
-                            {new Date(delivery.submitted_at).toLocaleDateString('pt-BR', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            })}
+                            {formatDateTime(delivery.submitted_at)}
                         </p>
                     </div>
                     {delivery.description && (
@@ -413,7 +409,7 @@ export default function RevisionView() {
             </div>
 
             {/* Ações de Revisão (Apenas Creator) */}
-            {userType === 'creator' && delivery.status === 'pending_review' && (
+            {userType === 'creator' && delivery.status === DELIVERY_STATUS.PENDING_REVIEW && (
                 <div className="mt-8">
                     <ReviewPanel
                         projectId={delivery.project_id}

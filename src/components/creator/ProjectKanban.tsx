@@ -95,6 +95,11 @@ function ProjectKanban({
     // Processar projetos: calcular status agregado para lotes
     const processedProjects = useMemo(() => {
         return projects.map(project => {
+            // Se já estiver arquivado, manter status
+            if (project.status === 'archived') {
+                return project;
+            }
+
             // Se for lote com vídeos, calcular status agregado
             if (project.is_batch && project.batch_videos && project.batch_videos.length > 0) {
                 const aggregatedStatus = calculateBatchAggregatedStatus(project.batch_videos);

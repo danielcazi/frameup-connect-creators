@@ -168,6 +168,77 @@ const EditorMyProjects = () => {
         setSelectedBatchId(null);
     };
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // HANDLERS DE ARQUIVAMENTO
+    // ═══════════════════════════════════════════════════════════════════════════
+    const handleArchive = async (projectId: string) => {
+        try {
+            // Optimistic update
+            setProjects(prev => prev.map(p =>
+                p.id === projectId ? { ...p, is_archived: true } : p
+            ));
+
+            const { error } = await supabase
+                .from('projects')
+                .update({ is_archived: true })
+                .eq('id', projectId);
+
+            if (error) {
+                // Rollback
+                setProjects(prev => prev.map(p =>
+                    p.id === projectId ? { ...p, is_archived: false } : p
+                ));
+                throw error;
+            }
+
+            toast({
+                title: "Projeto arquivado",
+                description: "O projeto foi movido para os arquivados.",
+            });
+        } catch (error) {
+            console.error('Error archiving project:', error);
+            toast({
+                title: "Erro ao arquivar",
+                description: "Não foi possível arquivar o projeto.",
+                variant: "destructive"
+            });
+        }
+    };
+
+    const handleUnarchive = async (projectId: string) => {
+        try {
+            // Optimistic update
+            setProjects(prev => prev.map(p =>
+                p.id === projectId ? { ...p, is_archived: false } : p
+            ));
+
+            const { error } = await supabase
+                .from('projects')
+                .update({ is_archived: false })
+                .eq('id', projectId);
+
+            if (error) {
+                // Rollback
+                setProjects(prev => prev.map(p =>
+                    p.id === projectId ? { ...p, is_archived: true } : p
+                ));
+                throw error;
+            }
+
+            toast({
+                title: "Projeto desarquivado",
+                description: "O projeto voltou para a lista principal.",
+            });
+        } catch (error) {
+            console.error('Error unarchiving project:', error);
+            toast({
+                title: "Erro ao desarquivar",
+                description: "Não foi possível desarquivar o projeto.",
+                variant: "destructive"
+            });
+        }
+    };
+
     // Filtrar projetos
     const filteredProjects = projects.filter(project => {
         const isArchived = project.is_archived === true;
@@ -305,6 +376,8 @@ const EditorMyProjects = () => {
                             projects={displayProjects}
                             isArchivedView={showArchived}
                             onOpenBatch={handleOpenBatch}
+                            onArchive={handleArchive}
+                            onUnarchive={handleUnarchive}
                         />
                     )}
                 </>

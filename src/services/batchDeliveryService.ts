@@ -1,4 +1,16 @@
 import { supabase } from '@/lib/supabase';
+import {
+    FREE_REVISIONS_LIMIT,
+    EDITOR_EARNINGS_PERCENTAGE,
+    EXTRA_REVISION_FEE_PERCENTAGE,
+    PLATFORM_FEE_ON_EXTRA_REVISIONS,
+    calculateExtraRevisionCost,
+} from '@/constants/businessRules';
+import {
+    PROJECT_STATUS,
+    BATCH_VIDEO_STATUS,
+    DELIVERY_STATUS,
+} from '@/constants/statusConstants';
 
 // =====================================================
 // INTERFACES
@@ -43,6 +55,32 @@ interface RevisionResult {
     error?: string;
 }
 
+// Tipos para dados do banco com joins
+interface ProjectData {
+    id: string;
+    title: string;
+    creator_id: string;
+    assigned_editor_id: string | null;
+    status: string;
+    base_price: number;
+    batch_quantity: number;
+    batch_delivery_mode: string | null;
+    editor_earnings_per_video: number | null;
+    editor_earnings_released: number;
+    videos_approved: number;
+}
+
+interface BatchVideoWithProject {
+    id: string;
+    project_id: string;
+    sequence_order: number;
+    title: string | null;
+    status: string;
+    revision_count: number;
+    paid_extra_revisions: boolean;
+    project: ProjectData;
+}
+
 // =====================================================
 // ENTREGAR VÍDEO (EDITOR)
 // =====================================================
@@ -71,13 +109,13 @@ export async function deliverBatchVideo({
         }
 
         // Verificar se editor está atribuído ao projeto
-        // @ts-ignore
-        if (batchVideo.project.assigned_editor_id !== user.id) {
+        const typedBatchVideo = batchVideo as unknown as BatchVideoWithProject;
+        if (typedBatchVideo.project.assigned_editor_id !== user.id) {
             throw new Error('Você não está atribuído a este projeto');
         }
 
         // Verificar se vídeo está em status válido para entrega
-        if (!['in_progress', 'revision'].includes(batchVideo.status)) {
+        if (!([BATCH_VIDEO_STATUS.IN_PROGRESS, BATCH_VIDEO_STATUS.REVISION] as string[]).includes(batchVideo.status)) {
             throw new Error('Este vídeo não está disponível para entrega');
         }
 
@@ -98,7 +136,7 @@ export async function deliverBatchVideo({
                 video_url: videoUrl,
                 notes: deliveryNotes || null,
                 version: version,
-                status: 'pending_review',
+                status: DELIVERY_STATUS.PENDING_REVIEW,
                 delivered_by: user.id,
                 delivered_at: new Date().toISOString(),
                 created_at: new Date().toISOString(),
@@ -115,7 +153,7 @@ export async function deliverBatchVideo({
         const { error: updateError } = await supabase
             .from('batch_videos')
             .update({
-                status: 'delivered',
+                status: BATCH_VIDEO_STATUS.DELIVERED,
                 delivery_id: delivery.id,
                 updated_at: new Date().toISOString(),
             })
@@ -130,29 +168,25 @@ export async function deliverBatchVideo({
         await supabase
             .from('projects')
             .update({
-                status: 'delivered',
+                status: PROJECT_STATUS.DELIVERED,
                 updated_at: new Date().toISOString(),
             })
             .eq('id', projectId)
-            .in('status', ['in_progress']); // Só atualiza se estiver em progresso
+            .in('status', [PROJECT_STATUS.IN_PROGRESS]); // Só atualiza se estiver em progresso
 
         // 6. Criar notificação para o cliente
-        // @ts-ignore
+        const typedBV = batchVideo as unknown as BatchVideoWithProject;
         await supabase.from('notifications').insert({
-            // @ts-ignore
-            user_id: batchVideo.project.creator_id,
+            user_id: typedBV.project.creator_id,
             type: 'video_delivered',
             title: '📦 Vídeo entregue!',
-            // @ts-ignore
-            message: `Vídeo #${batchVideo.sequence_order} "${batchVideo.title || ''}" foi entregue. Revise agora!`,
+            message: `Vídeo #${typedBV.sequence_order} "${typedBV.title || ''}" foi entregue. Revise agora!`,
             data: {
                 project_id: projectId,
                 batch_video_id: batchVideoId,
                 delivery_id: delivery.id,
-                // @ts-ignore
-                video_title: batchVideo.title,
-                // @ts-ignore
-                sequence_order: batchVideo.sequence_order,
+                video_title: typedBV.title,
+                sequence_order: typedBV.sequence_order,
             },
             read: false,
             created_at: new Date().toISOString(),
@@ -160,9 +194,10 @@ export async function deliverBatchVideo({
 
         return { success: true, delivery };
 
-    } catch (error: any) {
+    } catch (error) {
         console.error('Erro ao entregar vídeo:', error);
-        return { success: false, error: error.message };
+        const errorMessage = error instanceof Error ? error.message : 'Erro ao entregar vídeo';
+        return { success: false, error: errorMessage };
     }
 }
 
@@ -218,12 +253,12 @@ export async function approveBatchVideo({
         }
 
         // 4. Atualizar batch_video para aprovado
-        const paymentAmount = project.editor_earnings_per_video || (project.base_price * 0.85);
+        const paymentAmount = project.editor_earnings_per_video || (project.base_price * EDITOR_EARNINGS_PERCENTAGE);
 
         const { error: batchUpdateError } = await supabase
             .from('batch_videos')
             .update({
-                status: 'approved',
+                status: BATCH_VIDEO_STATUS.APPROVED,
                 approved_at: new Date().toISOString(),
                 payment_released_at: new Date().toISOString(),
                 payment_amount: paymentAmount,
@@ -245,7 +280,7 @@ export async function approveBatchVideo({
             .update({
                 videos_approved: newVideosApproved,
                 editor_earnings_released: newEarningsReleased,
-                status: allApproved ? 'completed' : project.status,
+                status: allApproved ? PROJECT_STATUS.COMPLETED : project.status,
                 updated_at: new Date().toISOString(),
             })
             .eq('id', projectId);
@@ -263,14 +298,14 @@ export async function approveBatchVideo({
                 .select('id')
                 .eq('project_id', projectId)
                 .eq('sequence_order', nextSequence)
-                .eq('status', 'pending')
+                .eq('status', BATCH_VIDEO_STATUS.PENDING)
                 .single();
 
             if (nextVideo) {
                 await supabase
                     .from('batch_videos')
                     .update({
-                        status: 'in_progress',
+                        status: BATCH_VIDEO_STATUS.IN_PROGRESS,
                         updated_at: new Date().toISOString(),
                     })
                     .eq('id', nextVideo.id);
@@ -325,9 +360,10 @@ export async function approveBatchVideo({
 
         return { success: true };
 
-    } catch (error: any) {
+    } catch (error) {
         console.error('Erro ao aprovar vídeo:', error);
-        return { success: false, error: error.message };
+        const errorMessage = error instanceof Error ? error.message : 'Erro ao aprovar vídeo';
+        return { success: false, error: errorMessage };
     }
 }
 
@@ -359,19 +395,17 @@ export async function requestBatchVideoRevision({
         }
 
         // Verificar se é o criador
-        // @ts-ignore
-        if (batchVideo.project.creator_id !== user.id) {
+        const typedBatchVideo = batchVideo as unknown as BatchVideoWithProject;
+        if (typedBatchVideo.project.creator_id !== user.id) {
             throw new Error('Você não é o criador deste projeto');
         }
 
         const newRevisionCount = (batchVideo.revision_count || 0) + 1;
-        const FREE_REVISIONS_LIMIT = 2;
         const needsPayment = newRevisionCount > FREE_REVISIONS_LIMIT && !batchVideo.paid_extra_revisions;
 
         // 2. Se precisa pagar, retornar aviso
         if (needsPayment) {
-            // @ts-ignore
-            const extraCost = (batchVideo.project.editor_earnings_per_video || batchVideo.project.base_price * 0.85) * 0.2;
+            const extraCost = calculateExtraRevisionCost(typedBatchVideo.project.editor_earnings_per_video || typedBatchVideo.project.base_price * EDITOR_EARNINGS_PERCENTAGE);
             return {
                 success: false,
                 needsPayment: true,
@@ -395,7 +429,7 @@ export async function requestBatchVideoRevision({
         const { error: batchUpdateError } = await supabase
             .from('batch_videos')
             .update({
-                status: 'revision',
+                status: BATCH_VIDEO_STATUS.REVISION,
                 revision_count: newRevisionCount,
                 updated_at: new Date().toISOString(),
             })
@@ -409,20 +443,17 @@ export async function requestBatchVideoRevision({
         await supabase
             .from('projects')
             .update({
-                status: 'revision',
+                status: PROJECT_STATUS.REVISION,
                 updated_at: new Date().toISOString(),
             })
             .eq('id', projectId);
 
         // 6. Notificar editor
-        // @ts-ignore
         await supabase.from('notifications').insert({
-            // @ts-ignore
-            user_id: batchVideo.project.assigned_editor_id,
+            user_id: typedBatchVideo.project.assigned_editor_id,
             type: 'revision_requested',
             title: '🔄 Revisão solicitada',
-            // @ts-ignore
-            message: `Cliente solicitou ajustes no vídeo #${batchVideo.sequence_order}. Revisão ${newRevisionCount}/${FREE_REVISIONS_LIMIT} grátis.`,
+            message: `Cliente solicitou ajustes no vídeo #${typedBatchVideo.sequence_order}. Revisão ${newRevisionCount}/${FREE_REVISIONS_LIMIT} grátis.`,
             data: {
                 project_id: projectId,
                 batch_video_id: batchVideoId,
@@ -436,9 +467,10 @@ export async function requestBatchVideoRevision({
 
         return { success: true };
 
-    } catch (error: any) {
+    } catch (error) {
         console.error('Erro ao solicitar revisão:', error);
-        return { success: false, error: error.message };
+        const errorMessage = error instanceof Error ? error.message : 'Erro ao solicitar revisão';
+        return { success: false, error: errorMessage };
     }
 }
 
@@ -471,9 +503,9 @@ export async function payForExtraRevisions({
         }
 
         // 2. Calcular custo
-        const editorEarnings = project.editor_earnings_per_video || (project.base_price * 0.85);
-        const extraCost = editorEarnings * 0.2; // 20% do valor do vídeo
-        const platformFee = extraCost * 0.15; // 15% taxa
+        const editorEarnings = project.editor_earnings_per_video || (project.base_price * EDITOR_EARNINGS_PERCENTAGE);
+        const extraCost = editorEarnings * EXTRA_REVISION_FEE_PERCENTAGE;
+        const platformFee = extraCost * PLATFORM_FEE_ON_EXTRA_REVISIONS;
         const totalCharge = extraCost + platformFee;
 
         // TODO: Implementar checkout Stripe
@@ -493,9 +525,10 @@ export async function payForExtraRevisions({
 
         return { success: true };
 
-    } catch (error: any) {
+    } catch (error) {
         console.error('Erro ao processar pagamento:', error);
-        return { success: false, error: error.message };
+        const errorMessage = error instanceof Error ? error.message : 'Erro ao processar pagamento';
+        return { success: false, error: errorMessage };
     }
 }
 

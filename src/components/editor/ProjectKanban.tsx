@@ -39,6 +39,8 @@ interface ProjectKanbanProps {
     projects: Project[];
     isArchivedView?: boolean;
     onOpenBatch?: (projectId: string) => void;
+    onArchive?: (projectId: string) => void;
+    onUnarchive?: (projectId: string) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -141,11 +143,22 @@ function calculateBatchAggregatedStatus(batchVideos: BatchVideo[]): string {
 // COMPONENTE PRINCIPAL
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function ProjectKanban({ projects, isArchivedView = false, onOpenBatch }: ProjectKanbanProps) {
+function ProjectKanban({
+    projects,
+    isArchivedView = false,
+    onOpenBatch,
+    onArchive,
+    onUnarchive
+}: ProjectKanbanProps) {
 
     // Processar projetos: calcular status agregado para lotes
     const processedProjects = useMemo(() => {
         return projects.map(project => {
+            // Se já estiver arquivado, manter status
+            if (project.status === 'archived') {
+                return project;
+            }
+
             // Se for lote com vídeos, calcular status agregado
             if (project.is_batch && project.batch_videos && project.batch_videos.length > 0) {
                 const aggregatedStatus = calculateBatchAggregatedStatus(project.batch_videos);
@@ -257,6 +270,8 @@ function ProjectKanban({ projects, isArchivedView = false, onOpenBatch }: Projec
                                             project={project}
                                             columnColor={column.color}
                                             onOpenBatch={onOpenBatch}
+                                            onArchive={onArchive}
+                                            onUnarchive={onUnarchive}
                                         />
                                     ))
                                 )}

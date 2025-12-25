@@ -21,6 +21,14 @@ import {
     approveDelivery,
     requestRevision
 } from '@/services/deliveryService';
+import {
+    FREE_REVISIONS_LIMIT,
+    calculateExtraRevisionCost,
+    calculateFreeRevisionsRemaining,
+    needsPaymentForRevision as checkNeedsPayment,
+} from '@/constants/businessRules';
+import { PROJECT_STATUS } from '@/constants/statusConstants';
+import { formatCurrency } from '@/utils/formatters';
 
 // =====================================================
 // INTERFACES
@@ -69,12 +77,11 @@ export function ReviewPanel({
     const [submitting, setSubmitting] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-    // Cálculos de revisões
-    const FREE_REVISIONS = 2;
+    // Cálculos de revisões - usando funções centralizadas
     const freeRevisionsUsed = batchVideo.revision_count;
-    const freeRevisionsRemaining = Math.max(0, FREE_REVISIONS - freeRevisionsUsed);
-    const needsPaymentForRevision = freeRevisionsUsed >= FREE_REVISIONS && !batchVideo.paid_extra_revisions;
-    const extraRevisionCost = editorEarningsPerVideo * 0.2;
+    const freeRevisionsRemaining = calculateFreeRevisionsRemaining(freeRevisionsUsed);
+    const requiresPaymentForRevision = checkNeedsPayment(freeRevisionsUsed, batchVideo.paid_extra_revisions);
+    const extraRevisionCost = calculateExtraRevisionCost(editorEarningsPerVideo);
 
     const navigate = useNavigate();
 
@@ -102,7 +109,7 @@ export function ReviewPanel({
             if (result.success) {
                 toast({
                     title: '✅ Vídeo aprovado!',
-                    description: `R$ ${editorEarningsPerVideo.toFixed(2)} liberado para ${editorName || 'o editor'}.`,
+                    description: `${formatCurrency(editorEarningsPerVideo)} liberado para ${editorName || 'o editor'}.`,
                 });
                 onUpdate();
                 // Redirect to rating page
@@ -136,7 +143,7 @@ export function ReviewPanel({
 
 
         // Verificar se precisa pagar
-        if (needsPaymentForRevision) {
+        if (requiresPaymentForRevision) {
             setShowPaymentModal(true);
             return;
         }
@@ -289,7 +296,7 @@ export function ReviewPanel({
       ===================================================== */}
             <div className={`border-2 rounded-xl p-4 ${freeRevisionsRemaining > 0
                 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                : needsPaymentForRevision
+                : requiresPaymentForRevision
                     ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
                     : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
                 }`}>
@@ -297,7 +304,7 @@ export function ReviewPanel({
                     <div className="flex items-center gap-3">
                         <Clock className={`w-5 h-5 ${freeRevisionsRemaining > 0
                             ? 'text-blue-600 dark:text-blue-400'
-                            : needsPaymentForRevision
+                            : requiresPaymentForRevision
                                 ? 'text-amber-600 dark:text-amber-400'
                                 : 'text-green-600 dark:text-green-400'
                             }`} />
@@ -307,7 +314,7 @@ export function ReviewPanel({
                             </div>
                             <div className="text-xs text-muted-foreground">
                                 {freeRevisionsRemaining > 0
-                                    ? `${freeRevisionsRemaining} de ${FREE_REVISIONS} disponíveis`
+                                    ? `${freeRevisionsRemaining} de ${FREE_REVISIONS_LIMIT} disponíveis`
                                     : batchVideo.paid_extra_revisions
                                         ? 'Revisões extras liberadas'
                                         : 'Esgotadas'
@@ -316,13 +323,13 @@ export function ReviewPanel({
                         </div>
                     </div>
 
-                    {needsPaymentForRevision && (
+                    {requiresPaymentForRevision && (
                         <div className="text-right">
                             <div className="text-xs text-amber-700 dark:text-amber-300 font-medium">
                                 Revisões extras:
                             </div>
                             <div className="text-lg font-bold text-amber-600 dark:text-amber-400">
-                                +R$ {extraRevisionCost.toFixed(2)}
+                                +{formatCurrency(extraRevisionCost)}
                             </div>
                         </div>
                     )}
@@ -335,7 +342,7 @@ export function ReviewPanel({
                             ? 'bg-blue-500'
                             : 'bg-amber-500'
                             }`}
-                        style={{ width: `${(freeRevisionsUsed / FREE_REVISIONS) * 100}%` }}
+                        style={{ width: `${(freeRevisionsUsed / FREE_REVISIONS_LIMIT) * 100}%` }}
                     />
                 </div>
             </div>
@@ -397,7 +404,7 @@ export function ReviewPanel({
                                 <span className="text-sm text-muted-foreground">Pagamento ao editor:</span>
                             </div>
                             <span className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                R$ {editorEarningsPerVideo.toFixed(2)}
+                                {formatCurrency(editorEarningsPerVideo)}
                             </span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
@@ -455,7 +462,7 @@ export function ReviewPanel({
                     </div>
 
                     {/* Aviso de Pagamento */}
-                    {needsPaymentForRevision && (
+                    {requiresPaymentForRevision && (
                         <div className="bg-amber-100 dark:bg-amber-900/30 border-2 border-amber-300 dark:border-amber-700 rounded-lg p-4">
                             <div className="flex items-start gap-3">
                                 <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
@@ -464,8 +471,8 @@ export function ReviewPanel({
                                         Revisões extras necessárias
                                     </p>
                                     <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                                        Você já usou suas {FREE_REVISIONS} revisões gratuitas.
-                                        Para solicitar mais revisões, será cobrado <strong>R$ {extraRevisionCost.toFixed(2)}</strong> (+20% do valor do vídeo).
+                                        Você já usou suas {FREE_REVISIONS_LIMIT} revisões gratuitas.
+                                        Para solicitar mais revisões, será cobrado <strong>{formatCurrency(extraRevisionCost)}</strong> (+20% do valor do vídeo).
                                     </p>
                                 </div>
                             </div>
@@ -494,7 +501,7 @@ export function ReviewPanel({
                                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                     Enviando...
                                 </span>
-                            ) : needsPaymentForRevision ? (
+                            ) : requiresPaymentForRevision ? (
                                 'Pagar e Solicitar'
                             ) : (
                                 'Estou ciente'
@@ -518,7 +525,7 @@ export function ReviewPanel({
                                 Revisões Extras
                             </h3>
                             <p className="text-sm text-muted-foreground mt-2">
-                                Você usou suas {FREE_REVISIONS} revisões gratuitas incluídas no pacote.
+                                Você usou suas {FREE_REVISIONS_LIMIT} revisões gratuitas incluídas no pacote.
                             </p>
                         </div>
 
@@ -526,7 +533,7 @@ export function ReviewPanel({
                             <div className="flex items-center justify-between">
                                 <span className="text-sm text-foreground">Pacote de 2 revisões extras:</span>
                                 <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                                    R$ {extraRevisionCost.toFixed(2)}
+                                    {formatCurrency(extraRevisionCost)}
                                 </span>
                             </div>
                             <p className="text-xs text-muted-foreground mt-2">

@@ -37,6 +37,13 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import DeliveryModal from '@/components/editor/DeliveryModal';
 import ApplicationModal from '@/components/editor/ApplicationModal';
 import { useToast } from '@/hooks/use-toast';
+import { formatCurrency, formatDateTime } from '@/utils/formatters';
+import {
+    canDeliver as canDeliverStatus,
+    getStatusBadgeConfig,
+    PROJECT_STATUS,
+    APPLICATION_STATUS,
+} from '@/constants/statusConstants';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -152,8 +159,8 @@ const EditorProjectDetails = () => {
         ? currentBatchVideo?.revision_count || 1
         : (filteredDeliveries.length || 1);
 
-    // Verificar se pode entregar
-    const canDeliver = ['in_progress', 'revision_requested', 'pending'].includes(currentStatus || '');
+    // Verificar se pode entregar (usando função centralizada)
+    const canDeliverVideo = canDeliverStatus(currentStatus);
 
     useEffect(() => {
         if (projectId) {
@@ -254,36 +261,10 @@ const EditorProjectDetails = () => {
         });
     };
 
-    // Helpers
-    const formatCurrency = (value: number) => {
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL'
-        }).format(value);
-    };
-
+    // Helpers - usando funções centralizadas
     const getStatusBadge = (status: string) => {
-        const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-            'pending': { label: 'Aguardando', variant: 'secondary' },
-            'in_progress': { label: 'Em Andamento', variant: 'default' },
-            'delivered': { label: 'Entregue', variant: 'outline' },
-            'in_review': { label: 'Em Revisão', variant: 'outline' },
-            'revision_requested': { label: 'Correções', variant: 'destructive' },
-            'approved': { label: 'Aprovado', variant: 'default' },
-            'completed': { label: 'Concluído', variant: 'default' },
-        };
-        const config = statusConfig[status] || { label: status, variant: 'secondary' };
+        const config = getStatusBadgeConfig(status);
         return <Badge variant={config.variant}>{config.label}</Badge>;
-    };
-
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('pt-BR', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
     };
 
     // Loading state
@@ -514,7 +495,7 @@ const EditorProjectDetails = () => {
                                     Chat com Creator
                                 </Button>
 
-                                {canDeliver && (
+                                {canDeliverVideo && (
                                     <Button
                                         className="flex-1"
                                         onClick={() => setIsDeliveryModalOpen(true)}
@@ -529,7 +510,7 @@ const EditorProjectDetails = () => {
                 )}
 
                 {/* Card de candidatura (Projeto Aberto e não é o editor) */}
-                {project.status === 'open' && !project.assigned_editor_id && (
+                {project.status === PROJECT_STATUS.OPEN && !project.assigned_editor_id && (
                     <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10">
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3 mb-4">
@@ -546,7 +527,7 @@ const EditorProjectDetails = () => {
                                 </div>
                             </div>
 
-                            {applicationStatus === 'none' ? (
+                            {applicationStatus === APPLICATION_STATUS.NONE ? (
                                 <Button
                                     className="w-full"
                                     onClick={() => setIsApplicationModalOpen(true)}
@@ -602,7 +583,7 @@ const EditorProjectDetails = () => {
                                                     )}
                                                 </p>
                                                 <p className="text-xs text-gray-500">
-                                                    {formatDate(delivery.created_at)}
+                                                    {formatDateTime(delivery.created_at)}
                                                 </p>
                                             </div>
                                         </div>

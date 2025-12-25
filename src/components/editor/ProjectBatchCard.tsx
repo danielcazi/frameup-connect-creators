@@ -8,7 +8,9 @@ import {
     Clock,
     PlayCircle,
     AlertCircle,
-    User
+    User,
+    Archive,
+    ArchiveRestore
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -46,6 +48,7 @@ interface Project {
     title: string;
     base_price: number;
     deadline_days: number;
+    is_archived?: boolean;
     batch_quantity?: number;
     batch_videos?: BatchVideo[];
     users?: {
@@ -61,6 +64,8 @@ interface ProjectBatchCardProps {
     progress: BatchProgress;
     columnColor?: string;
     onOpenBatch: (projectId: string) => void;
+    onArchive?: (projectId: string) => void;
+    onUnarchive?: (projectId: string) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -71,7 +76,9 @@ const ProjectBatchCard = ({
     project,
     progress,
     columnColor = '#3B82F6',
-    onOpenBatch
+    onOpenBatch,
+    onArchive,
+    onUnarchive
 }: ProjectBatchCardProps) => {
 
     const formatCurrency = (value: number) => {
@@ -252,6 +259,37 @@ const ProjectBatchCard = ({
                     <Eye className="w-3.5 h-3.5 mr-1.5" />
                     Abrir Projeto
                 </Button>
+
+                {/* Archive/Unarchive */}
+                {project.is_archived && onUnarchive && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 text-gray-400 hover:text-green-600 hover:bg-green-50 shrink-0"
+                        title="Desarquivar projeto"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onUnarchive(project.id);
+                        }}
+                    >
+                        <ArchiveRestore className="w-4 h-4" />
+                    </Button>
+                )}
+
+                {!project.is_archived && progress.completed === progress.total && progress.total > 0 && onArchive && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 text-gray-400 hover:text-red-600 hover:bg-red-50 shrink-0"
+                        title="Arquivar projeto"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onArchive(project.id);
+                        }}
+                    >
+                        <Archive className="w-4 h-4" />
+                    </Button>
+                )}
             </div>
         </div>
     );

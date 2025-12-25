@@ -9,49 +9,47 @@ import type {
     CreateReplyInput,
     DeliveryVideoType,
 } from '@/types/delivery';
+import {
+    detectVideoType as detectVideoTypeFromConstants,
+    convertGoogleDriveUrl,
+    getYouTubeVideoId,
+    VIDEO_PLATFORM,
+} from '@/constants/videoTypes';
+import { PROJECT_STATUS } from '@/constants/statusConstants';
 
 // ============================================
-// FUNÇÕES DE URL
+// FUNÇÕES DE URL (delegando para constants)
 // ============================================
 
-export function convertGoogleDriveUrl(url: string): string {
-    const fileIdMatch = url.match(/\/d\/([^\/]+)/);
-    if (fileIdMatch) {
-        return `https://drive.google.com/file/d/${fileIdMatch[1]}/preview`;
-    }
-    return url;
-}
-
+/**
+ * @deprecated Use detectVideoType from @/constants/videoTypes directly
+ */
 export function detectVideoType(url: string): { type: DeliveryVideoType | null; url: string; isValid: boolean; error?: string } {
-    // YouTube
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-        return { type: 'youtube', url, isValid: true };
-    }
+    const validation = detectVideoTypeFromConstants(url);
+    // Map platform to DeliveryVideoType
+    let type: DeliveryVideoType | null = null;
+    if (validation.platform === VIDEO_PLATFORM.YOUTUBE) type = 'youtube';
+    else if (validation.platform === VIDEO_PLATFORM.GOOGLE_DRIVE) type = 'gdrive';
+    else if (validation.platform === VIDEO_PLATFORM.VIMEO) type = 'vimeo';
+    else if (validation.platform === VIDEO_PLATFORM.DROPBOX) type = 'dropbox';
 
-    // Google Drive
-    if (url.includes('drive.google.com')) {
-        if (url.includes('/folders/')) {
-            return {
-                type: null,
-                url,
-                isValid: false,
-                error: 'Use o link de um arquivo de vídeo, não de uma pasta'
-            };
-        }
-
-        if (url.includes('/file/d/')) {
-            return { type: 'gdrive', url: convertGoogleDriveUrl(url), isValid: true };
-        }
-    }
-
-    return { type: null, url, isValid: false, error: 'URL não suportada. Use YouTube ou Google Drive.' };
+    return {
+        type,
+        url: validation.url,
+        isValid: validation.isValid,
+        error: validation.error,
+    };
 }
 
+/**
+ * @deprecated Use getYouTubeVideoId from @/constants/videoTypes directly
+ */
 export function getYouTubeId(url: string): string | null {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return match && match[2].length === 11 ? match[2] : null;
+    return getYouTubeVideoId(url);
 }
+
+// Re-export for backwards compatibility
+export { convertGoogleDriveUrl };
 
 // ============================================
 // ENTREGAS
@@ -88,9 +86,10 @@ export async function createDelivery(input: CreateDeliveryInput): Promise<{ deli
         // A RPC create_delivery já atualiza o status corretamente para 'in_review' (v1) ou 'pending_approval' (v2+)
 
         return { delivery, error: null };
-    } catch (error: any) {
+    } catch (error) {
         console.error('Error creating delivery:', error);
-        return { delivery: null, error: error.message || 'Erro ao criar entrega' };
+        const errorMessage = error instanceof Error ? error.message : 'Erro ao criar entrega';
+        return { delivery: null, error: errorMessage };
     }
 }
 
@@ -154,13 +153,18 @@ export async function approveDelivery(deliveryId: string, feedback?: string): Pr
         // Assuming RPC handles 'completed' correctly or 'approved'.
 
         return { success: true, error: null };
-    } catch (error: any) {
+    } catch (error) {
         console.error('Error approving delivery:', error);
-        return { success: false, error: error.message || 'Erro ao aprovar entrega' };
+        const errorMessage = error instanceof Error ? error.message : 'Erro ao aprovar entrega';
+        return { success: false, error: errorMessage };
     }
 }
 
-export async function requestRevision(deliveryId: string, feedback: string, targetStatus: 'revision_requested' | 'in_progress' = 'revision_requested'): Promise<{ success: boolean; error: string | null }> {
+export async function requestRevision(
+    deliveryId: string,
+    feedback: string,
+    targetStatus: typeof PROJECT_STATUS.REVISION_REQUESTED | typeof PROJECT_STATUS.IN_PROGRESS = PROJECT_STATUS.REVISION_REQUESTED
+): Promise<{ success: boolean; error: string | null }> {
     try {
         const { error } = await supabase.rpc('request_revision', {
             p_delivery_id: deliveryId,
@@ -189,9 +193,10 @@ export async function requestRevision(deliveryId: string, feedback: string, targ
         }
 
         return { success: true, error: null };
-    } catch (error: any) {
+    } catch (error) {
         console.error('Error requesting revision:', error);
-        return { success: false, error: error.message || 'Erro ao solicitar revisão' };
+        const errorMessage = error instanceof Error ? error.message : 'Erro ao solicitar revisão';
+        return { success: false, error: errorMessage };
     }
 }
 
@@ -294,9 +299,10 @@ export async function createComment(
         };
 
         return { comment: commentWithAuthor as DeliveryComment, error: null };
-    } catch (error: any) {
+    } catch (error) {
         console.error('Error creating comment:', error);
-        return { comment: null, error: error.message || 'Erro ao criar comentário' };
+        const errorMessage = error instanceof Error ? error.message : 'Erro ao criar comentário';
+        return { comment: null, error: errorMessage };
     }
 }
 
@@ -386,9 +392,10 @@ export async function createReply(
         };
 
         return { reply: replyWithAuthor as DeliveryCommentReply, error: null };
-    } catch (error: any) {
+    } catch (error) {
         console.error('Error creating reply:', error);
-        return { reply: null, error: error.message || 'Erro ao criar resposta' };
+        const errorMessage = error instanceof Error ? error.message : 'Erro ao criar resposta';
+        return { reply: null, error: errorMessage };
     }
 }
 
